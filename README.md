@@ -1,3 +1,2 @@
 # AI_ND
-The use of generative AI
-
+.v1로컬서버에서테스트완료
