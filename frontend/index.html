@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FridgeChef - 내 냉장고 AI 셰프</title>
+    <style>
+        /* 스타일(디자인) 정의 */
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f9f9f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #ff6b6b; margin-bottom: 30px; }
+        h2 { font-size: 1.2rem; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; color: #444; }
+        
+        input, select, button { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; border-radius: 8px; border: 1px solid #ddd; }
+        button { background-color: #ff6b6b; color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background-color: #fa5252; }
+        button.secondary { background-color: #868e96; }
+        button.vision-btn { background-color: #4c6ef5; } /* 사진 버튼은 파란색 */
+
+        #ingredient-list { list-style: none; padding: 0; }
+        .ingredient-item { background: #f1f3f5; padding: 10px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .delete-btn { background: #ff8787; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; width: auto; margin: 0; }
+
+        #loading { display: none; text-align: center; margin: 20px 0; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #ff6b6b; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #recipe-result { display: none; background: #fff0f6; padding: 20px; border-radius: 10px; border: 2px solid #ffdeeb; margin-top: 20px; }
+        .step { margin-bottom: 10px; padding-left: 20px; position: relative; }
+        .step:before { content: "🍳"; position: absolute; left: 0; }
+        
+        /* 파일 업로드 숨김 스타일 */
+        input[type="file"] { display: none; }
+        .file-label { display: block; padding: 10px; background: #e7f5ff; color: #228be6; text-align: center; border-radius: 8px; cursor: pointer; font-weight: bold; border: 1px dashed #228be6; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>👩‍🍳 FridgeChef</h1>
+
+    <div style="text-align: right; font-size: 0.8rem; color: #888;">
+        사용자 ID: <input type="text" id="user-id" value="user1" style="width: 60px; padding: 5px; display: inline-block;">
+        <button onclick="loadData()" style="width: auto; padding: 5px 10px; font-size: 0.8rem;">불러오기</button>
+    </div>
+
+    <h2>👤 내 입맛 프로필</h2>
+    <input type="text" id="allergies" placeholder="알레르기 (예: 땅콩, 새우)">
+    <input type="text" id="tools" placeholder="조리도구 (예: 에어프라이어, 냄비)">
+    <button class="secondary" onclick="saveProfile()">프로필 저장</button>
+
+    <h2>🧊 냉장고 속 재료</h2>
+    
+    <div style="margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 8px;">
+        <label for="img-input" class="file-label">📸 여기를 눌러 재료 사진 찍기/업로드</label>
+        <input type="file" id="img-input" accept="image/*" onchange="uploadImage()">
+        <div id="vision-loading" style="display:none; color: #4c6ef5; text-align: center; font-size: 0.9rem;">🤖 사진을 분석 중입니다...</div>
+    </div>
+
+    <div style="display: flex; gap: 5px;">
+        <input type="text" id="ing-name" placeholder="직접 입력 (예: 삼겹살)">
+        <input type="text" id="ing-qty" placeholder="수량 (예: 300g)" style="width: 30%;">
+    </div>
+    <button onclick="addIngredient()">재료 넣기</button>
+    
+    <ul id="ingredient-list"></ul>
+
+    <h2>✨ AI 셰프의 추천</h2>
+    <button onclick="generateRecipe()" style="height: 50px; font-size: 1.1rem;">🧑‍🍳 지금 바로 요리 추천받기!</button>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        <p>AI 셰프가 냉장고를 분석하고 있어요...</p>
+    </div>
+
+    <div id="recipe-result">
+        <h3 id="res-title"></h3>
+        <p><strong>사용 재료:</strong> <span id="res-materials"></span></p>
+        <h4>조리 순서</h4>
+        <div id="res-steps"></div>
+        <p style="margin-top: 15px; color: #e64980;"><strong>💡 셰프의 팁:</strong> <span id="res-tip"></span></p>
+    </div>
+</div>
+
+<script>
+    const API_URL = "http://127.0.0.1:5000";
+
+    async function loadData() {
+        const userId = document.getElementById('user-id').value;
+        try {
+            const resUser = await fetch(`${API_URL}/users/${userId}`);
+            const userData = await resUser.json();
+            if (!userData.error) {
+                document.getElementById('allergies').value = userData.allergies || '';
+                document.getElementById('tools').value = userData.tools || '';
+            }
+        } catch (e) {}
+
+        try {
+            const resIng = await fetch(`${API_URL}/ingredients/${userId}`);
+            const ingredients = await resIng.json();
+            renderIngredients(ingredients);
+        } catch (e) {}
+    }
+
+    function renderIngredients(list) {
+        const ul = document.getElementById('ingredient-list');
+        ul.innerHTML = '';
+        list.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'ingredient-item';
+            // 비전으로 등록된건 아이콘 표시
+            const icon = item.registrationType === 'vision' ? '📸' : '📝';
+            li.innerHTML = `
+                <span>${icon} ${item.name} (${item.quantity})</span>
+                <button class="delete-btn" onclick="deleteIngredient('${item.id}')">삭제</button>
+            `;
+            ul.appendChild(li);
+        });
+    }
+
+    // [추가됨] 사진 업로드 함수
+    async function uploadImage() {
+        const fileInput = document.getElementById('img-input');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const userId = document.getElementById('user-id').value;
+        
+        // 로딩 표시
+        document.getElementById('vision-loading').style.display = 'block';
+        document.querySelector('.file-label').innerText = "분석 중...";
+
+        const formData = new FormData();
+        formData.append('image', file);
+        formData.append('userId', userId);
+
+        try {
+            const response = await fetch(`${API_URL}/ingredients/vision`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.error) {
+                alert("실패: " + result.error);
+            } else {
+                alert(`성공! AI가 '${result.name}'을(를) 발견했습니다.`);
+                loadData(); // 목록 갱신
+            }
+        } catch (e) {
+            alert("업로드 오류 발생");
+            console.error(e);
+        } finally {
+            document.getElementById('vision-loading').style.display = 'none';
+            document.querySelector('.file-label').innerText = "📸 여기를 눌러 재료 사진 찍기/업로드";
+            fileInput.value = ''; // 입력 초기화
+        }
+    }
+
+    async function saveProfile() {
+        const userId = document.getElementById('user-id').value;
+        const data = {
+            username: "User",
+            allergies: document.getElementById('allergies').value,
+            tools: document.getElementById('tools').value
+        };
+        await fetch(`${API_URL}/users/${userId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        alert("프로필이 저장되었습니다!");
+    }
+
+    async function addIngredient() {
+        const userId = document.getElementById('user-id').value;
+        const name = document.getElementById('ing-name').value;
+        const qty = document.getElementById('ing-qty').value;
+
+        if (!name) return alert("재료 이름을 입력하세요!");
+
+        await fetch(`${API_URL}/ingredients/${userId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, quantity: qty })
+        });
+
+        document.getElementById('ing-name').value = '';
+        document.getElementById('ing-qty').value = '';
+        loadData();
+    }
+
+    async function deleteIngredient(id) {
+        if(!confirm("정말 삭제하시겠습니까?")) return;
+        await fetch(`${API_URL}/ingredients/delete/${id}`, { method: 'POST' });
+        loadData();
+    }
+
+    async function generateRecipe() {
+        const userId = document.getElementById('user-id').value;
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('recipe-result').style.display = 'none';
+
+        try {
+            const response = await fetch(`${API_URL}/ai/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: userId })
+            });
+            const result = await response.json();
+            
+            if (result.error) {
+                alert(result.error);
+            } else {
+                document.getElementById('res-title').innerText = result.recipeName;
+                document.getElementById('res-materials').innerText = result.materialsUsed;
+                document.getElementById('res-tip').innerText = result.tip;
+                const stepsDiv = document.getElementById('res-steps');
+                stepsDiv.innerHTML = '';
+                result.cookingSteps.forEach(step => {
+                    const p = document.createElement('p');
+                    p.className = 'step';
+                    p.innerText = step;
+                    stepsDiv.appendChild(p);
+                });
+                document.getElementById('recipe-result').style.display = 'block';
+            }
+        } catch (e) {
+            alert("오류가 발생했습니다.");
+        } finally {
+            document.getElementById('loading').style.display = 'none';
+        }
+    }
+
+    window.onload = loadData;
+</script>
+
+</body>
+</html>
