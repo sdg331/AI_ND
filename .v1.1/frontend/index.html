@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FridgeChef</title>
+    <style>
+        /* --- 스타일 --- */
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8f9fa; color: #333; margin: 0; padding-bottom: 90px; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        
+        input, select, button { padding: 12px; margin: 5px 0; width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; }
+        input:focus { outline: none; border-color: #ff6b6b; }
+        button { background-color: #ff6b6b; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button.secondary { background-color: #868e96; }
+        button.outline { background-color: white; color: #ff6b6b; border: 1px solid #ff6b6b; }
+
+        /* 카테고리 뱃지 선택 스타일 */
+        .cat-selector { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 10px; }
+        .cat-option {
+            padding: 8px 15px; border-radius: 20px; border: 1px solid #ddd; background: white; color: #666; cursor: pointer; font-size: 0.9rem; white-space: nowrap;
+        }
+        .cat-option.selected { background-color: #ff6b6b; color: white; border-color: #ff6b6b; }
+
+        /* 카테고리 필터 탭 (목록 상단) */
+        .filter-tabs { display: flex; gap: 10px; overflow-x: auto; margin-bottom: 15px; padding-bottom: 5px; border-bottom: 1px solid #eee; }
+        .filter-tab { background: none; border: none; color: #888; font-weight: bold; padding: 8px 5px; cursor: pointer; white-space: nowrap; width: auto; margin: 0; }
+        .filter-tab.active { color: #333; border-bottom: 3px solid #ff6b6b; }
+
+        /* 리스트 아이템 */
+        .ingredient-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .cat-tag { font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; background: #eee; color: #666; margin-right: 8px; }
+        
+        /* 하단 탭바 등 나머지 스타일은 유지 */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 70px; background: white; border-top: 1px solid #eee; display: flex; justify-content: space-around; box-shadow: 0 -5px 15px rgba(0,0,0,0.05); z-index: 1000; }
+        .nav-item { flex: 1; text-align: center; color: #adb5bd; font-size: 0.75rem; background: none; border: none; padding: 10px; cursor: pointer; }
+        .nav-item.active { color: #ff6b6b; font-weight: bold; }
+        .nav-icon { display: block; font-size: 1.6rem; margin-bottom: 4px; }
+        .tab-content { display: none; } .tab-content.active { display: block; }
+        .file-label { display: block; padding: 20px; background: #e7f5ff; color: #1c7ed6; text-align: center; border-radius: 15px; cursor: pointer; border: 2px dashed #74c0fc; margin-bottom: 20px; }
+        input[type="file"] { display: none; }
+        #loading, #vision-loading { display: none; text-align: center; margin: 20px 0; }
+    </style>
+</head>
+<body>
+
+<div style="background: white; padding: 15px 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 600px; margin: 0 auto;">
+        <h1 style="margin: 0; font-size: 1.3rem;">🥕 FridgeChef</h1>
+        <div style="font-size: 0.8rem; color: #888;">
+            <input type="text" id="my-user-id" value="user1" style="width: 60px; padding: 5px; text-align: center; display: inline-block;">
+            <button onclick="loadData()" style="width: auto; padding: 5px 10px; font-size: 0.7rem; margin: 0;" class="outline">🔄</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+    <div id="tab-home" class="tab-content active">
+        <div style="background: white; padding: 15px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #eee;">
+            <h3 style="margin: 0 0 10px 0; font-size: 1rem;">➕ 재료 추가</h3>
+            
+            <div class="cat-selector" id="input-cats">
+                <span class="cat-option selected" onclick="selectInputCat(this, '기타')">기타</span>
+                <span class="cat-option" onclick="selectInputCat(this, '육류')">🥩 육류</span>
+                <span class="cat-option" onclick="selectInputCat(this, '채소')">🥬 채소</span>
+                <span class="cat-option" onclick="selectInputCat(this, '과일')">🍎 과일</span>
+                <span class="cat-option" onclick="selectInputCat(this, '유제품')">🥛 유제품</span>
+                <span class="cat-option" onclick="selectInputCat(this, '가공')">🥫 가공</span>
+            </div>
+            <input type="hidden" id="selected-category" value="기타">
+
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="my-ing-name" placeholder="이름 (예: 계란)" style="flex: 2;">
+                <input type="text" id="my-ing-qty" placeholder="수량" style="flex: 1;">
+            </div>
+            <button onclick="addIngredient()" style="margin-top: 10px; width: 100%;">추가하기</button>
+            
+            <div style="margin-top: 15px; border-top: 1px dashed #ddd; padding-top: 10px;">
+                 <label for="my-img-input" style="font-size: 0.9rem; color: #1c7ed6; cursor: pointer;">📸 사진으로 자동 등록</label>
+                 <input type="file" id="my-img-input" accept="image/*" onchange="uploadImage()">
+                 <div id="vision-loading">🤖 분석 중...</div>
+            </div>
+        </div>
+
+        <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterList('전체')">전체</button>
+            <button class="filter-tab" onclick="filterList('육류')">육류</button>
+            <button class="filter-tab" onclick="filterList('채소')">채소</button>
+            <button class="filter-tab" onclick="filterList('과일')">과일</button>
+            <button class="filter-tab" onclick="filterList('유제품')">유제품</button>
+            <button class="filter-tab" onclick="filterList('가공')">가공</button>
+            <button class="filter-tab" onclick="filterList('기타')">기타</button>
+        </div>
+
+        <ul id="ingredient-list"></ul>
+        <div id="empty-msg" style="text-align: center; color: #adb5bd; margin-top: 20px; display: none;">냉장고가 비었어요.</div>
+    </div>
+
+    <div id="tab-recipe" class="tab-content">
+        <div style="text-align: center; padding: 50px 0;">
+            <div style="font-size: 4rem; margin-bottom: 15px;">👨‍🍳</div>
+            <h3>AI 셰프의 추천</h3>
+            <button onclick="generateRecipe()" style="padding: 15px 30px; font-size: 1.1rem; border-radius: 50px; width: auto;">✨ 레시피 추천받기</button>
+        </div>
+        <div id="loading">요리 중...</div>
+        <div id="recipe-result" style="display:none; background: white; padding: 20px; border-radius: 15px; margin-top: 20px;">
+            <h3 id="res-title" style="color: #ff6b6b;"></h3>
+            <p><strong>🛒 재료:</strong> <span id="res-materials"></span></p>
+            <div id="res-steps"></div>
+            <p id="res-tip" style="background: #fff9db; padding: 10px; border-radius: 8px; margin-top: 15px;"></p>
+        </div>
+    </div>
+
+    <div id="tab-profile" class="tab-content">
+        <h2>👤 내 입맛 설정</h2>
+        <input type="text" id="my-allergies" placeholder="알레르기">
+        <input type="text" id="my-tools" placeholder="조리도구">
+        <button class="secondary" onclick="saveProfile()" style="margin-top: 20px;">저장</button>
+    </div>
+</div>
+
+<nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('home')"><span class="nav-icon">🧊</span>냉장고</button>
+    <button class="nav-item" onclick="switchTab('recipe')"><span class="nav-icon">🧑‍🍳</span>AI 셰프</button>
+    <button class="nav-item" onclick="switchTab('profile')"><span class="nav-icon">👤</span>프로필</button>
+</nav>
+
+<script>
+    const API_URL = "http://127.0.0.1:5000";
+    let allIngredients = []; // 전체 목록 저장용
+
+    // --- 탭 전환 ---
+    function switchTab(name) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+        if(name=='home') document.querySelectorAll('.nav-item')[0].classList.add('active');
+        if(name=='recipe') document.querySelectorAll('.nav-item')[1].classList.add('active');
+        if(name=='profile') document.querySelectorAll('.nav-item')[2].classList.add('active');
+    }
+
+    // --- 카테고리 선택 UI ---
+    function selectInputCat(el, cat) {
+        document.querySelectorAll('.cat-option').forEach(opt => opt.classList.remove('selected'));
+        el.classList.add('selected');
+        document.getElementById('selected-category').value = cat;
+    }
+
+    // --- 목록 필터링 ---
+    function filterList(category) {
+        // 탭 스타일 변경
+        document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active');
+
+        const ul = document.getElementById('ingredient-list');
+        ul.innerHTML = '';
+        
+        const filtered = category === '전체' ? allIngredients : allIngredients.filter(i => i.category && i.category.includes(category));
+
+        if(filtered.length === 0) document.getElementById('empty-msg').style.display = 'block';
+        else {
+            document.getElementById('empty-msg').style.display = 'none';
+            filtered.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'ingredient-item';
+                // 카테고리 뱃지 표시
+                const catBadge = item.category ? `<span class="cat-tag">${item.category}</span>` : '';
+                li.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        ${catBadge}
+                        <span>${item.name} <b style="color:#ff6b6b;">${item.quantity}</b></span>
+                    </div>
+                    <button style="background:#ffc9c9; color:#c92a2a; padding:5px 10px; border-radius:8px; font-size:0.8rem;" onclick="del('${item.id}')">삭제</button>
+                `;
+                ul.appendChild(li);
+            });
+        }
+    }
+
+    async function loadData() {
+        const userId = document.getElementById('my-user-id').value;
+        try {
+            const res = await fetch(`${API_URL}/ingredients/${userId}`);
+            allIngredients = await res.json();
+            // 현재 활성화된 필터 탭을 찾아서 그 기준으로 다시 그리기
+            const activeTab = document.querySelector('.filter-tab.active');
+            filterList(activeTab ? activeTab.innerText : '전체');
+        } catch (e) { console.log("로딩 실패"); }
+    }
+
+    async function addIngredient() {
+        const userId = document.getElementById('my-user-id').value;
+        const name = document.getElementById('my-ing-name').value;
+        const qty = document.getElementById('my-ing-qty').value;
+        const category = document.getElementById('selected-category').value;
+
+        if (!name) return alert("이름을 입력하세요!");
+
+        try {
+            await fetch(`${API_URL}/ingredients/${userId}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, quantity: qty, category: category })
+            });
+            document.getElementById('my-ing-name').value = '';
+            document.getElementById('my-ing-qty').value = '';
+            loadData();
+            alert("추가되었습니다! (중복된 재료는 합쳐집니다)");
+        } catch (e) { alert("오류"); }
+    }
+
+    async function del(id) {
+        if(!confirm("삭제할까요?")) return;
+        await fetch(`${API_URL}/ingredients/delete/${id}`, { method: 'POST' });
+        loadData();
+    }
+    
+    // (나머지 사진 업로드, 레시피 생성 함수들은 기존과 동일하게 작동합니다)
+    // 편의상 생략했으나, 기존 코드가 있다면 그대로 두셔도 됩니다. 
+    // 위 addIngredient, loadData, filterList가 핵심입니다.
+    
+    async function uploadImage() { /* ...기존 코드 유지... */ 
+        const file = document.getElementById('my-img-input').files[0];
+        if(!file) return;
+        document.getElementById('vision-loading').style.display = 'block';
+        const formData = new FormData(); formData.append('image', file); formData.append('userId', document.getElementById('my-user-id').value);
+        try {
+            await fetch(`${API_URL}/ingredients/vision`, { method: 'POST', body: formData });
+            loadData();
+        } catch(e){ alert("업로드 실패"); }
+        finally { document.getElementById('vision-loading').style.display = 'none'; }
+    }
+
+    async function generateRecipe() { /* ...기존 코드 유지... */ 
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('recipe-result').style.display = 'none';
+        try {
+            const res = await fetch(`${API_URL}/ai/generate`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({userId: document.getElementById('my-user-id').value}) });
+            const json = await res.json();
+            if(json.error) alert(json.error);
+            else {
+                document.getElementById('res-title').innerText = json.recipeName;
+                document.getElementById('res-materials').innerText = json.materialsUsed;
+                document.getElementById('res-tip').innerText = json.tip;
+                const steps = document.getElementById('res-steps'); steps.innerHTML='';
+                json.cookingSteps.forEach(s => { const p = document.createElement('p'); p.innerText="🍳 "+s; steps.appendChild(p); });
+                document.getElementById('recipe-result').style.display = 'block';
+            }
+        } catch(e) { alert("오류"); } finally { document.getElementById('loading').style.display = 'none'; }
+    }
+
+    async function saveProfile() { /* ...기존 코드 유지... */ }
+
+    window.onload = function() { loadData(); switchTab('home'); };
+</script>
+</body>
+</html>
