@@ -1,0 +1,252 @@
+from flask import Flask, request, jsonify
+import gspread
+import datetime
+import uuid
+from flask_cors import CORS 
+import os
+from dotenv import load_dotenv
+import json
+import requests 
+import base64 
+
+# --- 환경 설정 ---
+load_dotenv() 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
+
+app = Flask(__name__)
+CORS(app) 
+
+# --- Google Sheets 설정 ---
+SERVICE_ACCOUNT_FILE = 'service_account.json' 
+SPREADSHEET_ID = '1tn2npx2hvbwVkpndUYW8y-V3qIVoV4sYgNcdCnkhKqA'
+
+try:
+    gc = gspread.service_account(filename=SERVICE_ACCOUNT_FILE)
+    spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+    users_worksheet = spreadsheet.worksheet("users")
+    ingredients_worksheet = spreadsheet.worksheet("ingredients")
+    recipes_worksheet = spreadsheet.worksheet("recipes")
+    print("✅ Google Sheets 연결 성공!")
+except Exception as e:
+    print(f"❌ Google Sheets 연결 오류: {e}")
+
+# --- 모델 자동 찾기 ---
+def get_working_model_name():
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+        res = requests.get(url)
+        data = res.json()
+        if 'models' in data:
+            for m in data['models']:
+                if 'gemini-1.5-flash' in m['name']: return m['name'].replace('models/', '')
+            for m in data['models']:
+                if 'generateContent' in m.get('supportedGenerationMethods', []): return m['name'].replace('models/', '')
+        return "gemini-pro"
+    except: return "gemini-pro"
+
+# --- API 구현 ---
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({"status": "Server is running"})
+
+@app.route('/users/<user_id>', methods=['GET', 'POST'])
+def handle_user_profile(user_id):
+    try:
+        if request.method == 'GET':
+            cell = users_worksheet.find(user_id)
+            if cell:
+                row = users_worksheet.row_values(cell.row) + [''] * 6
+                return jsonify({"allergies": row[1], "tools": row[2], "liked": row[3], "disliked": row[4], "goals": row[5]})
+            return jsonify({"allergies": "", "tools": "", "liked": "", "disliked": "", "goals": ""})
+        elif request.method == 'POST':
+            d = request.json
+            row = [user_id, d.get('allergies',''), d.get('tools',''), d.get('liked',''), d.get('disliked',''), d.get('goals','')]
+            cell = users_worksheet.find(user_id)
+            if cell: users_worksheet.update(f"A{cell.row}:F{cell.row}", [row])
+            else: users_worksheet.append_row(row)
+            return jsonify({"message": "저장 완료"}), 200
+    except: return jsonify({"error": "error"}), 500
+
+@app.route('/ingredients/<user_id>', methods=['GET', 'POST'])
+def handle_ingredients(user_id):
+    try:
+        if request.method == 'GET':
+            vals = ingredients_worksheet.get_all_values()
+            headers = vals[0]
+            data = []
+            for r in vals[1:]:
+                category = r[6] if len(r) > 6 else '기타'
+                if len(r) > 1 and r[1] == user_id: 
+                    item = dict(zip(headers, r))
+                    item['category'] = category
+                    data.append(item)
+            return jsonify(data)
+        elif request.method == 'POST':
+            if request.is_json:
+                d = request.json
+                ingredients_worksheet.append_row([str(uuid.uuid4()), user_id, d['name'], d.get('quantity','1개'), '', 'text', d.get('category','기타')])
+                return jsonify({"message": "추가 완료"}), 201
+            else: return jsonify({"error": "JSON 형식이 아닙니다"}), 400
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/ingredients/delete/<ingredient_id>', methods=['POST'])
+def delete_ingredient(ingredient_id):
+    return jsonify({"message": "삭제 완료"}), 200
+
+@app.route('/ai/generate', methods=['POST'])
+def generate_recipe():
+    try:
+        data = request.json
+        user_id = data.get('userId')
+        vals = ingredients_worksheet.get_all_values()
+        ing_list = [f"{r[2]}({r[3]})" for r in vals[1:] if r[1] == user_id]
+        ing_str = ", ".join(ing_list)
+        if not ing_str: return jsonify({"error": "냉장고가 비었습니다."}), 400
+
+        # 프로필 정보 추가
+        user_info_txt = ""
+        try:
+            cell = users_worksheet.find(user_id)
+            if cell:
+                row = users_worksheet.row_values(cell.row) + [''] * 6
+                user_info_txt = f"알레르기:{row[1]}, 도구:{row[2]}, 선호:{row[3]}, 기피:{row[4]}, 목표:{row[5]}"
+        except: pass
+
+        prompt_text = f"""
+        [재료] {ing_str}
+        [프로필] {user_info_txt}
+        위 정보를 바탕으로 최적의 레시피 1개를 추천해줘.
+        응답은 JSON 형식: {{ "recipeName": "이름", "materialsUsed": "재료", "cookingSteps": ["단계1", "단계2"], "tip": "팁" }}
+        """
+        
+        model_name = get_working_model_name()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        payload = { "contents": [{ "parts": [{"text": prompt_text}] }] }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+
+        if "error" in result: return jsonify({"error": result['error']['message']}), 500
+
+        ai_text = result['candidates'][0]['content']['parts'][0]['text'].replace('```json', '').replace('```', '').strip()
+        res_json = json.loads(ai_text)
+
+        recipes_worksheet.append_row([str(uuid.uuid4()), user_id, res_json.get('recipeName'), str(res_json.get('materialsUsed')), '', str(res_json)[:1000], str(datetime.datetime.now())])
+        return jsonify(res_json)
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+# --- [기능 2] 재료 사진 인식 (기존 유지) ---
+@app.route('/ingredients/vision', methods=['POST'])
+def vision_ingredient():
+    try:
+        if 'image' not in request.files: return jsonify({"error": "파일 없음"}), 400
+        file = request.files['image']
+        user_id = request.form.get('userId')
+        img_content = file.read()
+        img_b64 = base64.b64encode(img_content).decode('utf-8')
+        
+        model_name = get_working_model_name()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        
+        # 단일 재료 인식 프롬프트
+        payload = { "contents": [{ "parts": [ {"text": "재료 이름, 수량, 카테고리(육류/채소 등)를 JSON으로: {\"name\": \"이름\", \"quantity\": \"수량\", \"category\":\"카테고리\"}"}, {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}} ] }] }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+        if "error" in result: return jsonify({"error": result['error']['message']}), 500
+            
+        ai_text = result['candidates'][0]['content']['parts'][0]['text'].replace('```json', '').replace('```', '').strip()
+        res_json = json.loads(ai_text)
+
+        ingredients_worksheet.append_row([str(uuid.uuid4()), user_id, res_json.get('name'), res_json.get('quantity'), '', 'vision', res_json.get('category','기타')])
+        return jsonify(res_json)
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+# 👇👇👇 [신규 기능] 영수증 스캔 (OCR) 👇👇👇
+@app.route('/ingredients/receipt', methods=['POST'])
+def receipt_ocr():
+    try:
+        if 'image' not in request.files: return jsonify({"error": "파일 없음"}), 400
+        file = request.files['image']
+        user_id = request.form.get('userId')
+        img_content = file.read()
+        img_b64 = base64.b64encode(img_content).decode('utf-8')
+        
+        model_name = get_working_model_name()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        
+        # 영수증 전용 강력한 프롬프트
+        prompt_text = """
+        이 사진은 마트 영수증이야. 여기서 '식재료' 목록만 추출해줘.
+        가격, 날짜, 가게이름, 세금, 봉투값 같은 건 무시해.
+        오직 먹을 수 있는 재료 이름과 수량만 필요해.
+        카테고리는 (육류/채소/과일/유제품/가공/기타) 중 하나로 분류해줘.
+        
+        응답은 반드시 아래와 같은 JSON 리스트 형식이어야 해:
+        [
+            {"name": "계란", "quantity": "1판", "category": "유제품"},
+            {"name": "우유", "quantity": "2개", "category": "유제품"},
+            {"name": "양파", "quantity": "1망", "category": "채소"}
+        ]
+        """
+        
+        payload = { "contents": [{ "parts": [ {"text": prompt_text}, {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}} ] }] }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+        
+        if "error" in result: return jsonify({"error": result['error']['message']}), 500
+            
+        ai_text = result['candidates'][0]['content']['parts'][0]['text'].replace('```json', '').replace('```', '').strip()
+        
+        # 리스트 형태의 JSON 파싱
+        items_list = json.loads(ai_text)
+        
+        # 결과가 리스트가 아니면 리스트로 감싸기 (방어 코드)
+        if not isinstance(items_list, list):
+            items_list = [items_list]
+
+        # 시트에 한꺼번에 추가
+        added_count = 0
+        for item in items_list:
+            ingredients_worksheet.append_row([
+                str(uuid.uuid4()), 
+                user_id, 
+                item.get('name', '알수없음'), 
+                item.get('quantity', '1개'), 
+                '', 
+                'receipt', # 영수증으로 등록됨 표시
+                item.get('category', '기타')
+            ])
+            added_count += 1
+            
+        return jsonify({"message": f"영수증에서 {added_count}개의 재료를 발견하여 등록했습니다!", "items": items_list})
+
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+# --- [기능 3] 챗봇 ---
+@app.route('/ai/chat', methods=['POST'])
+def chat_chef():
+    try:
+        data = request.json
+        user_msg = data.get('message')
+        recipe_context = data.get('context', '')
+        
+        prompt_text = f"요리 챗봇. 상황: {recipe_context}. 질문: {user_msg}. 짧게 답변해줘."
+        model_name = get_working_model_name()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+        
+        headers = {'Content-Type': 'application/json'}
+        payload = { "contents": [{ "parts": [{"text": prompt_text}] }] }
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+
+        if "error" in result: return jsonify({"error": "답변 불가"}), 500
+        return jsonify({"answer": result['candidates'][0]['content']['parts'][0]['text']})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
