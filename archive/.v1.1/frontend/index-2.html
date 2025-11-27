@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>FridgeChef - 내 냉장고 AI 셰프</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f9f9f9;
+      color: #333;
+      padding-bottom: 80px;
+    }
+
+    .page { min-height: 100vh; }
+
+    /* 상단 헤더 */
+    .top-header {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .top-header-inner {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ff6b6b, #ffa8a8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 18px;
+      box-shadow: 0 4px 10px rgba(250,82,82,0.4);
+    }
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .logo-main {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #ff6b6b;
+    }
+    .logo-sub {
+      font-size: 0.75rem;
+      color: #868e96;
+    }
+    .user-box {
+      font-size: 0.8rem;
+      color: #868e96;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .user-box input {
+      width: 60px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      border: 1px solid #dee2e6;
+      font-size: 0.8rem;
+    }
+    .user-box button {
+      padding: 4px 8px;
+      background: #ff6b6b;
+      color: white;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    /* 컨테이너 */
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 16px 20px 20px;
+    }
+
+    /* 화면 */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* 카드 */
+    .card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+
+    h1 { text-align: center; color: #ff6b6b; margin: 0 0 20px; font-size: 1.3rem; }
+    h2 { font-size: 1rem; color: #444; border-bottom: 2px solid #eee; padding-bottom: 8px; margin: 15px 0 10px; }
+    h3 { color: #e64980; margin: 8px 0; font-size: 0.95rem; }
+    h4 { color: #495057; margin: 10px 0 6px; font-size: 0.9rem; }
+
+    /* 폼 요소 */
+    input, textarea, button {
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+    }
+    textarea {
+      resize: none;
+      min-height: 90px;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #ff6b6b;
+      box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.1);
+    }
+
+    button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.2s;
+      background: #ff6b6b;
+      color: white;
+    }
+    button:hover { background: #fa5252; }
+    button.secondary { background: #868e96; }
+    button.secondary:hover { background: #495057; }
+
+    .row {
+      display: flex;
+      gap: 5px;
+    }
+    .row input:last-child {
+      width: 35%;
+    }
+
+    /* 재료 리스트 */
+    #ingredient-list {
+      list-style: none;
+      padding: 0;
+      margin: 10px 0;
+    }
+    .ingredient-item {
+      background: #f1f3f5;
+      padding: 10px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+    .delete-btn {
+      background: #ff8787;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      width: auto;
+      margin: 0;
+    }
+
+    /* 파일 업로드 */
+    input[type="file"] { display: none; }
+    .file-label {
+      display: block;
+      padding: 10px;
+      background: #e7f5ff;
+      color: #228be6;
+      text-align: center;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      border: 1px dashed #228be6;
+      margin-bottom: 5px;
+      font-size: 0.85rem;
+    }
+    #vision-loading {
+      display: none;
+      color: #4c6ef5;
+      text-align: center;
+      font-size: 0.85rem;
+      margin-top: 5px;
+    }
+
+    /* 로딩 */
+    #loading {
+      display: none;
+      text-align: center;
+      margin: 15px 0;
+      font-size: 0.85rem;
+      color: #868e96;
+    }
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #ff6b6b;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 8px;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* 레시피 결과 */
+    #recipe-result {
+      display: none;
+      background: #fff0f6;
+      padding: 16px;
+      border-radius: 10px;
+      border: 2px solid #ffdeeb;
+      margin-top: 15px;
+    }
+    .step {
+      margin-bottom: 8px;
+      padding-left: 20px;
+      position: relative;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .step::before {
+      content: "🍳";
+      position: absolute;
+      left: 0;
+    }
+
+    /* 뱃지 */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      background: #fff5f5;
+      color: #c92a2a;
+      margin: 2px 4px 2px 0;
+    }
+    .badge button {
+      border: none;
+      background: none;
+      cursor: pointer;
+      padding: 0;
+      color: inherit;
+      font-size: 0.75rem;
+    }
+
+    .pref-input-row {
+      display: flex;
+      gap: 5px;
+      margin-top: 4px;
+    }
+    .pref-input-row input {
+      flex: 1;
+      margin: 0;
+    }
+    .pref-input-row button {
+      width: 36px;
+      margin: 0;
+      padding: 8px;
+      border-radius: 8px;
+    }
+
+    .label-small {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #495057;
+      margin-top: 8px;
+      margin-bottom: 4px;
+    }
+
+    /* 하단 탭바 */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+      box-shadow: 0 -4px 14px rgba(0,0,0,0.06);
+      z-index: 30;
+      height: 70px;
+    }
+    .bottom-nav-inner {
+      max-width: 600px;
+      margin: 0 auto;
+      display: flex;
+      height: 100%;
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      color: #adb5bd;
+      font-size: 0.75rem;
+      transition: all 0.2s;
+      border: none;
+      background: none;
+    }
+    .nav-item .icon {
+      font-size: 1.6rem;
+    }
+    .nav-item.active {
+      color: #ff6b6b;
+      font-weight: 700;
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 12px 16px; }
+      .top-header-inner { padding: 8px 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- 상단 헤더 -->
+  <div class="top-header">
+    <div class="top-header-inner">
+      <div class="logo-area">
+        <div class="logo-circle">🍳</div>
+        <div class="logo-text">
+          <div class="logo-main">FridgeChef</div>
+          <div class="logo-sub">내 냉장고 AI 셰프</div>
+        </div>
+      </div>
+      <div class="user-box">
+        ID:
+        <input type="text" id="user-id" value="user1" />
+        <button type="button" onclick="loadData()">불러오기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 메인 컨테이너 -->
+  <div class="container">
+
+    <!-- 냉장고 화면 -->
+    <section id="screen-fridge" class="screen active">
+      <div class="card">
+        <h1>🧊 냉장고</h1>
+        <h2>📸 사진으로 등록</h2>
+        <label for="img-input" class="file-label">📸 여기를 눌러 재료 사진 찍기/업로드</label>
+        <input type="file" id="img-input" accept="image/*" onchange="uploadImage()">
+        <div id="vision-loading">🤖 사진을 분석 중입니다...</div>
+
+        <h2>✏️ 직접 입력</h2>
+        <div class="row">
+          <input type="text" id="ing-name" placeholder="재료명 (예: 삼겹살)">
+          <input type="text" id="ing-qty" placeholder="수량 (예: 300g)">
+        </div>
+        <button type="button" onclick="addIngredient()">재료 넣기</button>
+
+        <h2>📋 내 재료 목록</h2>
+        <ul id="ingredient-list"></ul>
+      </div>
+    </section>
+
+    <!-- AI 셰프 화면 -->
+    <section id="screen-recipe" class="screen">
+      <div class="card">
+        <h1>👨‍🍳 AI 셰프</h1>
+        <p style="font-size:0.85rem;color:#868e96;text-align:center;margin:0 0 15px;">
+          냉장고 속 재료를 분석해서 오늘의 추천 요리를 만들어드립니다.
+        </p>
+        <button type="button" onclick="generateRecipe()" style="height:50px;font-size:1.05rem;background:linear-gradient(135deg,#ff6b6b,#fa5252);">
+          🧑‍🍳 지금 바로 요리 추천받기!
+        </button>
+
+        <div id="loading">
+          <div class="spinner"></div>
+          <p>AI 셰프가 냉장고를 분석하고 있어요...</p>
+        </div>
+
+        <div id="recipe-result">
+          <h3 id="res-title"></h3>
+          <p><strong>사용 재료:</strong> <span id="res-materials"></span></p>
+          <h4>조리 순서</h4>
+          <div id="res-steps"></div>
+          <p style="margin-top:12px;color:#e64980;font-size:0.9rem;">
+            <strong>💡 셰프의 팁:</strong> <span id="res-tip"></span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 프로필 화면 -->
+    <section id="screen-profile" class="screen">
+      <div class="card">
+        <h1>👤 내 입맛 프로필</h1>
+        <p style="font-size:0.85rem;color:#868e96;margin:0 0 12px;">
+          알레르기와 조리도구 정보를 등록하면 AI가 더 맞춤형 레시피를 추천해줍니다.
+        </p>
+        <h2>기본 정보</h2>
+        <input type="text" id="allergies" placeholder="알레르기 (예: 땅콩, 새우)">
+        <input type="text" id="tools" placeholder="조리도구 (예: 에어프라이어, 냄비)">
+        <button type="button" class="secondary" onclick="saveProfile()">프로필 저장</button>
+
+        <h2>상세 취향 (로컬)</h2>
+        <div style="margin-bottom:12px;">
+          <div class="label-small">💚 좋아하는 재료</div>
+          <div id="favTags"></div>
+          <div class="pref-input-row">
+            <input id="favInput" type="text" placeholder="예: 연어, 아보카도" disabled onkeypress="onPrefEnter(event, 'fav')" />
+            <button type="button" id="favBtn" onclick="addPrefTag('fav')" disabled>+</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div class="label-small">❌ 싫어하는 재료</div>
+          <div id="dislikeTags"></div>
+          <div class="pref-input-row">
+            <input id="dislikeInput" type="text" placeholder="예: 오이, 고수" disabled onkeypress="onPrefEnter(event, 'dislike')" />
+            <button type="button" id="dislikeBtn" onclick="addPrefTag('dislike')" disabled>+</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div class="label-small">⚠️ 알레르기 목록 (로컬)</div>
+          <div id="allergyTags"></div>
+          <div class="pref-input-row">
+            <input id="allergyInput" type="text" placeholder="예: 우유, 견과류" disabled onkeypress="onPrefEnter(event, 'allergy')" />
+            <button type="button" id="allergyBtn" onclick="addPrefTag('allergy')" disabled>+</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <div class="label-small">🥗 식단 제한</div>
+          <div id="dietTags"></div>
+          <div class="pref-input-row">
+            <input id="dietInput" type="text" placeholder="예: 비건, 저염식" disabled onkeypress="onPrefEnter(event, 'diet')" />
+            <button type="button" id="dietBtn" onclick="addPrefTag('diet')" disabled>+</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="label-small">🔪 보유 도구 (로컬)</div>
+          <div id="toolTags"></div>
+          <div class="pref-input-row">
+            <input id="toolInput" type="text" placeholder="예: 에어프라이어, 오븐" disabled onkeypress="onPrefEnter(event, 'tool')" />
+            <button type="button" id="toolBtn" onclick="addPrefTag('tool')" disabled>+</button>
+          </div>
+        </div>
+
+        <button type="button" onclick="toggleEditProfile()" style="margin-top:12px;">
+          ⚙️ 상세 취향 수정하기
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- 하단 탭바 (정확히 3개) -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <button class="nav-item active" data-target="fridge" onclick="switchScreen('fridge', this)">
+        <span class="icon">🧊</span>
+        <span>냉장고</span>
+      </button>
+      <button class="nav-item" data-target="recipe" onclick="switchScreen('recipe', this)">
+        <span class="icon">👨‍🍳</span>
+        <span>AI 셰프</span>
+      </button>
+      <button class="nav-item" data-target="profile" onclick="switchScreen('profile', this)">
+        <span class="icon">👤</span>
+        <span>프로필</span>
+      </button>
+    </div>
+  </nav>
+</div>
+
+<script>
+  const API_URL = "http://127.0.0.1:5000";
+
+  /* 화면 전환 */
+  function switchScreen(name, btnEl) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    btnEl.classList.add('active');
+  }
+
+  /* API: 데이터 불러오기 */
+  async function loadData() {
+    const userId = document.getElementById('user-id').value;
+
+    // 프로필
+    try {
+      const res = await fetch(`${API_URL}/users/${userId}`);
+      const data = await res.json();
+      if (!data.error) {
+        document.getElementById('allergies').value = data.allergies || '';
+        document.getElementById('tools').value = data.tools || '';
+      }
+    } catch (e) { console.log('profile load error'); }
+
+    // 재료
+    try {
+      const res = await fetch(`${API_URL}/ingredients/${userId}`);
+      const data = await res.json();
+      renderIngredients(data);
+    } catch (e) { console.log('ingredients load error'); }
+  }
+
+  function renderIngredients(list) {
+    const ul = document.getElementById('ingredient-list');
+    ul.innerHTML = '';
+    if (!list || !list.length) {
+      const li = document.createElement('li');
+      li.textContent = '냉장고가 비어 있어요.';
+      li.style.fontSize = '0.85rem';
+      li.style.color = '#adb5bd';
+      li.style.padding = '10px';
+      ul.appendChild(li);
+      return;
+    }
+    list.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'ingredient-item';
+      const icon = item.type === 'vision' || item.registrationType === 'vision' ? '📸' : '📝';
+      li.innerHTML = `
+        <span>${icon} ${item.name || item.item_name || ''} (${item.quantity || ''})</span>
+        <button class="delete-btn" onclick="deleteIngredient('${item.id || item.ID || ''}')">삭제</button>
+      `;
+      ul.appendChild(li);
+    });
+  }
+
+  /* API: 사진 업로드 */
+  async function uploadImage() {
+    const fileInput = document.getElementById('img-input');
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    const userId = document.getElementById('user-id').value;
+    document.getElementById('vision-loading').style.display = 'block';
+    document.querySelector('.file-label').textContent = '분석 중...';
+
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('userId', userId);
+
+    try {
+      const res = await fetch(`${API_URL}/ingredients/vision`, { method: 'POST', body: formData });
+      const result = await res.json();
+      if (result.error) {
+        alert('실패: ' + result.error);
+      } else {
+        alert(`성공! AI가 '${result.name}'을(를) 발견했습니다.`);
+        loadData();
+      }
+    } catch (e) {
+      alert('업로드 오류');
+    } finally {
+      document.getElementById('vision-loading').style.display = 'none';
+      document.querySelector('.file-label').textContent = '📸 여기를 눌러 재료 사진 찍기/업로드';
+      fileInput.value = '';
+    }
+  }
+
+  /* API: 프로필 저장 */
+  async function saveProfile() {
+    const userId = document.getElementById('user-id').value;
+    const data = {
+      username: "User",
+      allergies: document.getElementById('allergies').value,
+      tools: document.getElementById('tools').value
+    };
+    try {
+      await fetch(`${API_URL}/users/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      alert('프로필이 저장되었습니다!');
+    } catch (e) {
+      alert('저장 오류');
+    }
+  }
+
+  /* API: 재료 추가 */
+  async function addIngredient() {
+    const userId = document.getElementById('user-id').value;
+    const name = document.getElementById('ing-name').value;
+    const qty = document.getElementById('ing-qty').value;
+    if (!name) { alert('재료 이름을 입력하세요!'); return; }
+
+    try {
+      await fetch(`${API_URL}/ingredients/${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, quantity: qty })
+      });
+      document.getElementById('ing-name').value = '';
+      document.getElementById('ing-qty').value = '';
+      loadData();
+    } catch (e) { alert('추가 오류'); }
+  }
+
+  /* API: 재료 삭제 */
+  async function deleteIngredient(id) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    try {
+      await fetch(`${API_URL}/ingredients/delete/${id}`, { method: 'POST' });
+      loadData();
+    } catch (e) { alert('삭제 오류'); }
+  }
+
+  /* API: 레시피 생성 */
+  async function generateRecipe() {
+    const userId = document.getElementById('user-id').value;
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('recipe-result').style.display = 'none';
+
+    try {
+      const res = await fetch(`${API_URL}/ai/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const result = await res.json();
+      if (result.error) {
+        alert(result.error);
+      } else {
+        document.getElementById('res-title').textContent = result.recipeName;
+        document.getElementById('res-materials').textContent = result.materialsUsed;
+        document.getElementById('res-tip').textContent = result.tip || '';
+        const stepsBox = document.getElementById('res-steps');
+        stepsBox.innerHTML = '';
+        (result.cookingSteps || []).forEach(step => {
+          const p = document.createElement('p');
+          p.className = 'step';
+          p.textContent = step;
+          stepsBox.appendChild(p);
+        });
+        document.getElementById('recipe-result').style.display = 'block';
+      }
+    } catch (e) { alert('레시피 생성 오류'); }
+    finally { document.getElementById('loading').style.display = 'none'; }
+  }
+
+  /* 로컬: 프로필 취향 (로컬에서만 관리) */
+  const prefState = {
+    edit: false,
+    fav: ['계란', '스팸'],
+    dislike: ['오이'],
+    allergy: [],
+    diet: [],
+    tool: ['프라이팬', '냄비']
+  };
+
+  function renderPrefTags() {
+    renderTagBox('favTags', prefState.fav, 'fav');
+    renderTagBox('dislikeTags', prefState.dislike, 'dislike');
+    renderTagBox('allergyTags', prefState.allergy, 'allergy');
+    renderTagBox('dietTags', prefState.diet, 'diet');
+    renderTagBox('toolTags', prefState.tool, 'tool');
+
+    const edit = prefState.edit;
+    ['fav','dislike','allergy','diet','tool'].forEach(k => {
+      const inputId = k + 'Input';
+      const btnId = k + 'Btn';
+      const inp = document.getElementById(inputId);
+      const btn = document.getElementById(btnId);
+      if (inp) inp.disabled = !edit;
+      if (btn) btn.disabled = !edit;
+    });
+  }
+
+  function renderTagBox(boxId, list, kind) {
+    const box = document.getElementById(boxId);
+    box.innerHTML = '';
+    if (!list.length) {
+      const span = document.createElement('span');
+      span.style.fontSize = '0.8rem';
+      span.style.color = '#adb5bd';
+      span.textContent = '등록된 항목이 없습니다';
+      box.appendChild(span);
+      return;
+    }
+    list.forEach((val, idx) => {
+      const badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = val;
+      if (prefState.edit) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = '✕';
+        btn.onclick = () => removePrefTag(kind, idx);
+        badge.appendChild(btn);
+      }
+      box.appendChild(badge);
+    });
+  }
+
+  function toggleEditProfile() {
+    prefState.edit = !prefState.edit;
+    renderPrefTags();
+  }
+
+  function addPrefTag(kind) {
+    if (!prefState.edit) return;
+
+    let inputId, list;
+    if (kind === 'fav') { inputId = 'favInput'; list = prefState.fav; }
+    else if (kind === 'dislike') { inputId = 'dislikeInput'; list = prefState.dislike; }
+    else if (kind === 'allergy') { inputId = 'allergyInput'; list = prefState.allergy; }
+    else if (kind === 'diet') { inputId = 'dietInput'; list = prefState.diet; }
+    else if (kind === 'tool') { inputId = 'toolInput'; list = prefState.tool; }
+
+    const input = document.getElementById(inputId);
+    const v = (input.value || '').trim();
+    if (!v) return;
+    if (list.includes(v)) { alert(`'${v}'는 이미 있습니다.`); input.value = ''; return; }
+    list.push(v);
+    input.value = '';
+    renderPrefTags();
+  }
+
+  function removePrefTag(kind, idx) {
+    if (!prefState.edit) return;
+    if (kind === 'fav') prefState.fav.splice(idx, 1);
+    else if (kind === 'dislike') prefState.dislike.splice(idx, 1);
+    else if (kind === 'allergy') prefState.allergy.splice(idx, 1);
+    else if (kind === 'diet') prefState.diet.splice(idx, 1);
+    else if (kind === 'tool') prefState.tool.splice(idx, 1);
+    renderPrefTags();
+  }
+
+  function onPrefEnter(e, kind) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addPrefTag(kind);
+    }
+  }
+
+  window.onload = function() {
+    loadData();
+    renderPrefTags();
+  };
+</script>
+</body>
+</html>
