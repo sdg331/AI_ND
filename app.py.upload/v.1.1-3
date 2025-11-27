@@ -1,0 +1,244 @@
+from flask import Flask, request, jsonify
+import gspread
+import datetime
+import uuid
+from flask_cors import CORS 
+import os
+from dotenv import load_dotenv
+import json
+import requests 
+import base64 
+
+# --- 환경 설정 ---
+load_dotenv() 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") 
+
+app = Flask(__name__)
+CORS(app) 
+
+# --- Google Sheets 설정 ---
+SERVICE_ACCOUNT_FILE = 'service_account.json' 
+SPREADSHEET_ID = '1tn2npx2hvbwVkpndUYW8y-V3qIVoV4sYgNcdCnkhKqA'
+
+try:
+    gc = gspread.service_account(filename=SERVICE_ACCOUNT_FILE)
+    spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+    users_worksheet = spreadsheet.worksheet("users")
+    ingredients_worksheet = spreadsheet.worksheet("ingredients")
+    recipes_worksheet = spreadsheet.worksheet("recipes")
+    print("✅ Google Sheets 연결 성공!")
+except Exception as e:
+    print(f"❌ Google Sheets 연결 오류: {e}")
+
+# 👇👇👇 [최종 해결책] 구글에게 직접 물어봐서 작동하는 모델 찾기 👇👇👇
+def find_working_model():
+    try:
+        print("🔍 구글 서버에 사용 가능한 모델 목록을 요청 중...")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+        response = requests.get(url)
+        data = response.json()
+        
+        if 'error' in data:
+            print(f"❌ API 키 오류: {data['error']['message']}")
+            return None
+
+        # 사용 가능한 모델 후보군 찾기
+        valid_models = []
+        if 'models' in data:
+            for m in data['models']:
+                # 채팅/생성이 가능한 모델만 골라냄
+                if 'generateContent' in m.get('supportedGenerationMethods', []):
+                    # 이름에서 'models/' 제거 (예: models/gemini-pro -> gemini-pro)
+                    clean_name = m['name'].replace('models/', '')
+                    valid_models.append(clean_name)
+        
+        if not valid_models:
+            print("❌ 사용할 수 있는 모델이 하나도 없습니다.")
+            return None
+
+        print(f"📋 발견된 모델 목록: {valid_models}")
+
+        # 우선순위: 1.5-flash -> 1.5-pro -> pro -> 아무거나
+        preferred_order = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro', 'gemini-1.0-pro']
+        
+        # 1. 우리가 아는 좋은 모델이 목록에 있는지 확인
+        for pref in preferred_order:
+            for valid in valid_models:
+                if pref in valid: # 예: 'gemini-1.5-flash-001' 안에 'gemini-1.5-flash'가 포함되면 선택
+                    print(f"✅ 최적 모델 선택됨: {valid}")
+                    return valid
+        
+        # 2. 없으면 목록의 첫 번째 모델 무조건 선택
+        fallback = valid_models[0]
+        print(f"⚠️ 최적 모델 없음. 첫 번째 모델 사용: {fallback}")
+        return fallback
+
+    except Exception as e:
+        print(f"❌ 모델 검색 중 오류: {e}")
+        return "gemini-pro" # 최후의 수단
+
+# --- 서버 시작 시 모델 확정 ---
+CURRENT_MODEL = find_working_model()
+# ---------------------------
+
+# --- API 구현 ---
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({"status": "Server is running", "model": CURRENT_MODEL})
+
+@app.route('/users/<user_id>', methods=['GET', 'POST'])
+def handle_user_profile(user_id):
+    try:
+        if request.method == 'GET':
+            return jsonify({"username": "User", "allergies": "", "tools": ""})
+        else:
+            return jsonify({"message": "저장 완료"}), 200
+    except: return jsonify({"error": "error"}), 500
+
+@app.route('/ingredients/<user_id>', methods=['GET', 'POST'])
+def handle_ingredients(user_id):
+    try:
+        if request.method == 'GET':
+            vals = ingredients_worksheet.get_all_values()
+            headers = vals[0]
+            data = []
+            for r in vals[1:]:
+                category = r[6] if len(r) > 6 else '기타'
+                if len(r) > 1 and r[1] == user_id: 
+                    item = dict(zip(headers, r))
+                    item['category'] = category
+                    data.append(item)
+            return jsonify(data)
+        elif request.method == 'POST':
+            if request.is_json:
+                d = request.json
+                ingredients_worksheet.append_row([str(uuid.uuid4()), user_id, d['name'], d.get('quantity','1개'), '', 'text', d.get('category','기타')])
+                return jsonify({"message": "추가 완료"}), 201
+            else:
+                return jsonify({"error": "JSON 형식이 아닙니다"}), 400
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/ingredients/delete/<ingredient_id>', methods=['POST'])
+def delete_ingredient(ingredient_id):
+    return jsonify({"message": "삭제 완료"}), 200
+
+# --- [기능 1] 레시피 생성 (찾아낸 모델 사용) ---
+@app.route('/ai/generate', methods=['POST'])
+def generate_recipe():
+    try:
+        data = request.json
+        user_id = data.get('userId')
+        vals = ingredients_worksheet.get_all_values()
+        ing_list = [f"{r[2]}({r[3]})" for r in vals[1:] if r[1] == user_id]
+        ing_str = ", ".join(ing_list)
+        
+        if not ing_str: return jsonify({"error": "냉장고가 비었습니다."}), 400
+
+        prompt_text = f"""
+        재료: {ing_str}
+        이 재료로 만들 수 있는 요리 레시피 1개를 추천해줘.
+        응답은 JSON 형식으로:
+        {{ "recipeName": "이름", "materialsUsed": "재료", "cookingSteps": ["단계1", "단계2"], "tip": "팁" }}
+        """
+        
+        # 👇 위에서 찾아낸 '되는 모델' 주소 사용
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{CURRENT_MODEL}:generateContent?key={GEMINI_API_KEY}"
+        
+        headers = {'Content-Type': 'application/json'}
+        payload = { "contents": [{ "parts": [{"text": prompt_text}] }] }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+
+        if "error" in result:
+             return jsonify({"error": f"AI 오류: {result['error']['message']}"}), 500
+
+        try:
+            ai_text = result['candidates'][0]['content']['parts'][0]['text']
+            ai_text = ai_text.replace('```json', '').replace('```', '').strip()
+            res_json = json.loads(ai_text)
+        except:
+            res_json = {"recipeName": "AI 요리", "materialsUsed": ing_str, "cookingSteps": [str(result)], "tip": "오류"}
+
+        recipes_worksheet.append_row([str(uuid.uuid4()), user_id, res_json.get('recipeName'), str(res_json.get('materialsUsed')), '', str(res_json)[:1000], str(datetime.datetime.now())])
+        return jsonify(res_json)
+    except Exception as e:
+        return jsonify({"error": f"실패: {str(e)}"}), 500
+
+
+# --- [기능 2] 사진 인식 (찾아낸 모델 사용) ---
+@app.route('/ingredients/vision', methods=['POST'])
+def vision_ingredient():
+    try:
+        if 'image' not in request.files:
+            return jsonify({"error": "이미지 파일이 없습니다."}), 400
+        
+        file = request.files['image']
+        user_id = request.form.get('userId')
+        img_content = file.read()
+        img_b64 = base64.b64encode(img_content).decode('utf-8')
+        
+        # 👇 사진도 똑같은 모델 사용
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{CURRENT_MODEL}:generateContent?key={GEMINI_API_KEY}"
+        
+        headers = {'Content-Type': 'application/json'}
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": "이 사진에 있는 식재료 이름과 수량을 JSON으로 알려줘: {\"name\": \"이름\", \"quantity\": \"수량\", \"category\":\"카테고리\"}. 재료가 여러개면 가장 메인 재료 1개만."},
+                    {"inline_data": {"mime_type": "image/jpeg", "data": img_b64}}
+                ]
+            }]
+        }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+        
+        if "error" in result:
+            return jsonify({"error": f"사진 분석 실패: {result['error']['message']}"}), 500
+            
+        ai_text = result['candidates'][0]['content']['parts'][0]['text']
+        ai_text = ai_text.replace('```json', '').replace('```', '').strip()
+        
+        try:
+            res_json = json.loads(ai_text)
+        except:
+            res_json = {"name": "사진재료", "quantity": "1개", "category": "기타"}
+
+        ingredients_worksheet.append_row([str(uuid.uuid4()), user_id, res_json.get('name','알수없음'), res_json.get('quantity','1개'), '', 'vision', res_json.get('category','기타')])
+        return jsonify(res_json)
+
+    except Exception as e:
+        return jsonify({"error": f"오류 발생: {str(e)}"}), 500
+
+# --- [기능 3] 챗봇 (찾아낸 모델 사용) ---
+@app.route('/ai/chat', methods=['POST'])
+def chat_chef():
+    try:
+        data = request.json
+        user_msg = data.get('message')
+        recipe_context = data.get('context', '')
+        
+        prompt_text = f"요리 챗봇. 상황: {recipe_context}. 질문: {user_msg}. 짧게 답변해줘."
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{CURRENT_MODEL}:generateContent?key={GEMINI_API_KEY}"
+        
+        headers = {'Content-Type': 'application/json'}
+        payload = { "contents": [{ "parts": [{"text": prompt_text}] }] }
+        
+        response = requests.post(url, headers=headers, json=payload)
+        result = response.json()
+
+        if "error" in result:
+             return jsonify({"error": "답변 불가"}), 500
+
+        try:
+            ai_answer = result['candidates'][0]['content']['parts'][0]['text']
+            return jsonify({"answer": ai_answer})
+        except:
+            return jsonify({"answer": "죄송해요, 다시 질문해주세요."})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
