@@ -1,9 +1,9 @@
 
 ## 터미널 명령어
 ```text
-**[venv활성화]** .\venv\Scripts\Activate.ps1
-**[백엔드진입]** cd backend
-**[실행]** python app.py
+[venv활성화] .\venv\Scripts\Activate.ps1
+[백엔드진입] cd backend
+[실행] python app.py
 ```
 ### 앞으로 해야할 것(중요한 순서대로 정리)
 ###### -.v1 테스트
