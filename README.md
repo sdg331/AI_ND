@@ -91,3 +91,11 @@ FridgeChef는 인공지능(AI)과 멀티모달(이미지+텍스트) 분석 기�
   - 식단/건강 목표
   - 선호 난이도/스타일
 - AI 레시피 생성 시 이 설정 정보가 반영됨
+
+## 📁 문서 안내 (docs 폴더)
+
+- 전체 설정 개요: `docs/PROJECT_SETUP.md`
+- Cloud / AI / 서비스 계정: `docs/CLOUD_CONFIG.md`
+- Google Sheets 설정: `docs/SHEETS_CONFIG.md`
+- 환경 변수 형식: `docs/ENV_EXAMPLE.md`
+- 로컬 실행 / 터미널 가이드: `docs/TERMINAL_GUIDE.md`
