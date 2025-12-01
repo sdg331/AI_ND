@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FridgeChef</title>
+    <style>
+        /* --- 기본 스타일 --- */
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8f9fa; color: #333; margin: 0; padding-bottom: 100px; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        
+        input, button { padding: 12px; width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; }
+        input:focus { outline: none; border-color: #ff6b6b; }
+        button { background-color: #ff6b6b; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 5px; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button:active { transform: scale(0.98); }
+        button.secondary { background-color: #868e96; }
+        button.outline { background-color: white; color: #ff6b6b; border: 1px solid #ff6b6b; margin: 0; }
+
+        /* 탭바 */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 70px; background: white; border-top: 1px solid #eee; display: flex; justify-content: space-around; z-index: 1000; }
+        .nav-item { flex: 1; text-align: center; color: #adb5bd; font-size: 0.75rem; padding: 10px; background: none; border: none; cursor: pointer; }
+        .nav-item.active { color: #ff6b6b; font-weight: bold; }
+        .nav-icon { display: block; font-size: 1.6rem; margin-bottom: 4px; }
+
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 스크롤 블록 */
+        .scroll-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; width: 100%; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+        .scroll-container::-webkit-scrollbar { height: 6px; }
+        .scroll-container::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+        .select-block { min-width: 90px; height: 80px; background: white; border: 2px solid #eee; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
+        .select-block.selected { border-color: #ff6b6b; background-color: #fff5f5; color: #ff6b6b; }
+        .block-icon { font-size: 1.8rem; margin-bottom: 5px; }
+        .block-text { font-size: 0.8rem; font-weight: bold; text-align: center;}
+
+        /* 모달 (설정 팝업) */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: popUp 0.3s; }
+        @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; color: #333; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; color: #888; cursor: pointer; padding: 0; width: auto; box-shadow: none; }
+
+        /* 챗봇 */
+        .chat-fab { position: fixed; bottom: 90px; left: 20px; width: 60px; height: 60px; background-color: #228be6; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.8rem; box-shadow: 0 4px 15px rgba(34, 139, 230, 0.4); z-index: 2000; cursor: pointer; }
+        .chat-bubble { position: fixed; bottom: 160px; left: 25px; background: #fff; padding: 8px 12px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; color: #228be6; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 2000; pointer-events: none; animation: float 2s infinite ease-in-out; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        #chat-window { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 320px; height: 450px; background: white; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 3000; flex-direction: column; overflow: hidden; border: 2px solid #e7f5ff; resize: both; }
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 80%; padding: 10px; border-radius: 12px; font-size: 0.9rem; }
+        .msg.user { align-self: flex-end; background: #228be6; color: white; }
+        .msg.bot { align-self: flex-start; background: white; border: 1px solid #eee; }
+        .chat-input-area { padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px; background: white; }
+        
+        /* 기타 */
+        #ingredient-list { list-style: none; padding: 0; }
+        .ingredient-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .file-label { display: block; flex: 1; padding: 20px; background: #e7f5ff; color: #1c7ed6; text-align: center; border-radius: 15px; border: 2px dashed #74c0fc; cursor: pointer; }
+        input[type="file"] { display: none; }
+        #loading, #vision-loading { display: none; text-align: center; margin: 20px 0; color: #868e96; }
+        .delete-btn { background: #ffc9c9; color: #c92a2a; padding: 8px 12px; width: auto; font-size: 0.8rem; border-radius: 8px; }
+        #recipe-result { display: none; background: #fff; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-top: 20px; border: 1px solid #ffe3e3; }
+        .pref-btn { background: #fff0f6; color: #e64980; border: 1px dashed #ff6b6b; width: 100%; padding: 15px; border-radius: 15px; margin-bottom: 20px; text-align: left; position: relative; }
+        .pref-btn:after { content: '⚙️ 설정 >'; position: absolute; right: 15px; }
+    </style>
+</head>
+<body>
+
+<div style="background: white; padding: 15px 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 600px; margin: 0 auto;">
+        <h1 style="margin: 0; font-size: 1.3rem;">🥕 FridgeChef</h1>
+        <div style="font-size: 0.8rem; color: #888;">
+            <input type="text" id="my-user-id" value="user1" style="width: 60px; padding: 5px; text-align: center; display: inline-block;">
+            <button onclick="loadData()" style="width: auto; padding: 5px 10px; font-size: 0.7rem;" class="outline">🔄</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div id="tab-home" class="tab-content active">
+        <h2 style="margin-top: 0;">📸 재료 추가</h2>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <label for="my-img-input" class="file-label">🍎<br>사진 촬영</label>
+            <label for="receipt-input" class="file-label" style="background:#f3f0ff; color:#7950f2; border-color:#b197fc;">🧾<br>영수증 OCR</label>
+        </div>
+        <input type="file" id="my-img-input" accept="image/*" onchange="uploadImage()">
+        <input type="file" id="receipt-input" accept="image/*" onchange="uploadReceipt()">
+        <div id="vision-loading">🤖 분석 중...</div>
+
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <input type="text" id="my-ing-name" placeholder="이름 (예: 양파)" style="flex: 2;">
+            <input type="text" id="my-ing-qty" placeholder="수량" style="flex: 1;">
+            <button onclick="addIngredient()" style="flex: 1;">추가</button>
+        </div>
+        <h2>🧊 나의 냉장고</h2>
+        <ul id="ingredient-list"></ul>
+        <div id="empty-msg" style="text-align: center; color: #adb5bd; margin-top: 20px; display: none;">텅 비었어요!</div>
+    </div>
+
+    <div id="tab-recipe" class="tab-content">
+        <div style="text-align: center; padding: 30px 0;">
+            <button class="pref-btn" onclick="openPrefModal()">
+                <strong>🧐 어떤 요리를 만들까요?</strong><br>
+                <span style="font-size: 0.8rem; color: #868e96; font-weight: normal;">재료범위, 종류, 상황, 난이도 설정</span>
+            </button>
+
+            <div style="font-size: 4rem;">👨‍🍳</div>
+            <h3>AI 셰프의 추천</h3>
+            <button onclick="generateRecipe()" style="width: auto; padding: 15px 30px; border-radius: 30px;">✨ 레시피 추천받기</button>
+        </div>
+        <div id="loading">요리 중...</div>
+        <div id="recipe-result">
+            <h3 id="res-title" style="color: #ff6b6b;"></h3>
+            <p><strong>🛒 재료:</strong> <span id="res-materials"></span></p>
+            <div id="res-steps" style="margin-top:15px;"></div>
+        </div>
+    </div>
+
+    <div id="tab-profile" class="tab-content">
+        <h2 style="margin-top: 0;">👤 기본 프로필</h2>
+        <label>🚫 알레르기</label><input type="text" id="prof-allergies">
+        <label style="margin-top: 15px;">🔪 조리도구</label><div class="scroll-container" id="tools-container"></div>
+        <label style="margin-top: 15px;">🎯 목표</label><div class="scroll-container" id="goals-container"></div>
+        <button onclick="saveProfile()" style="margin-top: 30px;">저장하기</button>
+    </div>
+</div>
+
+<div id="pref-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🍳 레시피 설정</h3>
+            <button class="close-btn" onclick="closePrefModal()">✕</button>
+        </div>
+        
+        <label>1. 재료 범위</label>
+        <div class="scroll-container" id="pref-scope-container"></div>
+        
+        <label style="margin-top: 20px;">2. 요리 종류</label>
+        <div class="scroll-container" id="pref-type-container"></div>
+        
+        <label style="margin-top: 20px;">3. 상황</label>
+        <div class="scroll-container" id="pref-occasion-container"></div>
+        
+        <label style="margin-top: 20px;">4. 난이도</label>
+        <div class="scroll-container" id="pref-difficulty-container"></div>
+
+        <button onclick="savePreferences()" style="margin-top: 30px;">설정 저장하기</button>
+    </div>
+</div>
+
+<div class="chat-bubble">도움이 필요하신가요?</div>
+<div class="chat-fab" onclick="toggleChat()">🆘</div>
+<div id="chat-window" style="display:none;">
+    <div class="chat-header"><span>👨‍🍳 쿠킹 어시스턴트</span><button class="close-chat" onclick="toggleChat()">✕</button></div>
+    <div class="chat-messages" id="chat-messages"><div class="msg bot">안녕하세요! 무엇을 도와드릴까요?</div></div>
+    <div class="chat-input-area"><input type="text" id="chat-input"><button onclick="sendChat()">전송</button></div>
+</div>
+
+<nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('home')"><span class="nav-icon">🧊</span>냉장고</button>
+    <button class="nav-item" onclick="switchTab('recipe')"><span class="nav-icon">🧑‍🍳</span>AI 셰프</button>
+    <button class="nav-item" onclick="switchTab('profile')"><span class="nav-icon">👤</span>프로필</button>
+</nav>
+
+<script>
+    const API_URL = "http://127.0.0.1:5000";
+    let currentRecipeName = "";
+
+    // --- 데이터 정의 ---
+    const PREF_SCOPE = [{icon:"🏠",name:"집 재료만"}, {icon:"🛒",name:"외부 재료 포함"}];
+    const PREF_TYPE = [{icon:"🍚",name:"식사"}, {icon:"🥪",name:"간식"}, {icon:"🍺",name:"안주"}];
+    const PREF_OCCASION = [{icon:"🙍",name:"혼자"}, {icon:"👨‍👩‍👧",name:"가족"}, {icon:"🎉",name:"손님접대"}];
+    const PREF_DIFFICULTY = [{icon:"🐣",name:"쉬움"}, {icon:"👨‍🍳",name:"보통"}, {icon:"🔥",name:"어려움"}];
+    const TOOL_LIST = [{icon:"🍳",name:"프라이팬"},{icon:"🔥",name:"가스레인지"},{icon:"🥘",name:"냄비"},{icon:"♨️",name:"에어프라이어"},{icon:"🍕",name:"오븐"},{icon:"⚡",name:"전자레인지"}];
+    const GOAL_LIST = [{icon:"🥗",name:"다이어트"},{icon:"💪",name:"고단백"},{icon:"🧂",name:"저염식"},{icon:"🌿",name:"비건"}];
+
+    // --- UI 함수 ---
+    function createBlocks(cid, list, sel, multi=true) {
+        const c = document.getElementById(cid); c.innerHTML = ''; 
+        const sels = sel ? sel.split(',').map(s=>s.trim()) : [];
+        list.forEach(i => {
+            const d = document.createElement('div'); d.className = 'select-block';
+            if(sels.includes(i.name)) d.classList.add('selected');
+            d.onclick = () => {
+                if(!multi) { // 단일 선택 모드
+                    Array.from(c.children).forEach(child=>child.classList.remove('selected'));
+                    d.classList.add('selected');
+                } else { // 다중 선택 모드
+                    d.classList.toggle('selected');
+                }
+            };
+            d.innerHTML = `<span class="block-icon">${i.icon}</span><span class="block-text">${i.name}</span>`;
+            c.appendChild(d);
+        });
+    }
+    function getVal(cid) { return Array.from(document.querySelectorAll(`#${cid} .select-block.selected .block-text`)).map(el=>el.innerText).join(','); }
+
+    // --- 모달 제어 ---
+    function openPrefModal() { document.getElementById('pref-modal').style.display = 'flex'; }
+    function closePrefModal() { document.getElementById('pref-modal').style.display = 'none'; }
+
+    // --- 데이터 로드 & 저장 ---
+    async function loadData() {
+        const uid = document.getElementById('my-user-id').value;
+        // 재료 로드
+        try {
+            const r = await fetch(`${API_URL}/ingredients/${uid}`); const l = await r.json();
+            const ul = document.getElementById('ingredient-list'); ul.innerHTML = '';
+            if(l.length===0) document.getElementById('empty-msg').style.display='block';
+            else { document.getElementById('empty-msg').style.display='none'; l.forEach(i=>{ul.innerHTML+=`<li class="ingredient-item"><span>${i.name} ${i.quantity}</span><button class="delete-btn" onclick="del('${i.id}')">삭제</button></li>`}); }
+        } catch(e){}
+        // 프로필 & 설정 로드
+        try {
+            const r = await fetch(`${API_URL}/users/${uid}`); const d = await r.json();
+            if(!d.error) {
+                // 기본 프로필
+                document.getElementById('prof-allergies').value = d.allergies||'';
+                createBlocks('tools-container', TOOL_LIST, d.tools||'');
+                createBlocks('goals-container', GOAL_LIST, d.goals||'');
+                // 레시피 설정 (단일 선택)
+                createBlocks('pref-scope-container', PREF_SCOPE, d.pref_scope||'', false);
+                createBlocks('pref-type-container', PREF_TYPE, d.pref_type||'', false);
+                createBlocks('pref-occasion-container', PREF_OCCASION, d.pref_occasion||'', false);
+                createBlocks('pref-difficulty-container', PREF_DIFFICULTY, d.pref_difficulty||'', false);
+            }
+        } catch(e){}
+    }
+
+    async function saveProfile() {
+        const uid = document.getElementById('my-user-id').value;
+        const d = { allergies: document.getElementById('prof-allergies').value, tools: getVal('tools-container'), goals: getVal('goals-container') };
+        await sendUpdate(uid, d);
+    }
+
+    async function savePreferences() {
+        const uid = document.getElementById('my-user-id').value;
+        const d = {
+            pref_scope: getVal('pref-scope-container'),
+            pref_type: getVal('pref-type-container'),
+            pref_occasion: getVal('pref-occasion-container'),
+            pref_difficulty: getVal('pref-difficulty-container')
+        };
+        await sendUpdate(uid, d);
+        closePrefModal();
+    }
+
+    async function sendUpdate(uid, data) {
+        try { await fetch(`${API_URL}/users/${uid}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); alert("저장되었습니다!"); }
+        catch(e) { alert("오류"); }
+    }
+
+    // --- 기타 기능 (챗봇, 탭전환, 레시피생성 등) ---
+    function switchTab(n) {
+        document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+        document.getElementById('tab-'+n).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+        if(n=='home') document.querySelectorAll('.nav-item')[0].classList.add('active');
+        if(n=='recipe') document.querySelectorAll('.nav-item')[1].classList.add('active');
+        if(n=='profile') document.querySelectorAll('.nav-item')[2].classList.add('active');
+    }
+    async function addIngredient() {
+        const uid = document.getElementById('my-user-id').value; const n = document.getElementById('my-ing-name').value; const q = document.getElementById('my-ing-qty').value;
+        if(!n) return alert("입력하세요");
+        await fetch(`${API_URL}/ingredients/${uid}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:n, quantity:q})});
+        loadData();
+    }
+    async function del(id) { if(confirm("삭제?")) { await fetch(`${API_URL}/ingredients/delete/${id}`, {method:'POST'}); loadData(); } }
+    async function uploadImage() { /* 기존 사진 코드 */ }
+    async function uploadReceipt() { /* 기존 영수증 코드 */ }
+    
+    function toggleChat() { const w = document.getElementById('chat-window'); w.style.display = (w.style.display==='flex')?'none':'flex'; }
+    async function sendChat() {
+        const i = document.getElementById('chat-input'); const m = i.value; if(!m) return;
+        const c = document.getElementById('chat-messages'); c.innerHTML+=`<div class="msg user">${m}</div>`; i.value='';
+        try { const r = await fetch(`${API_URL}/ai/chat`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:m, context:currentRecipeName})}); const d = await r.json(); c.innerHTML+=`<div class="msg bot">${d.answer||d.error}</div>`; }
+        catch(e){ c.innerHTML+=`<div class="msg bot">오류</div>`; }
+    }
+
+    async function generateRecipe() {
+        document.getElementById('loading').style.display = 'block'; document.getElementById('recipe-result').style.display = 'none';
+        try {
+            const res = await fetch(`${API_URL}/ai/generate`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({userId: document.getElementById('my-user-id').value})});
+            const json = await res.json();
+            if(json.error) alert(json.error);
+            else {
+                currentRecipeName = json.recipeName;
+                document.getElementById('res-title').innerText = json.recipeName;
+                document.getElementById('res-materials').innerText = json.materialsUsed;
+                document.getElementById('res-steps').innerHTML = json.cookingSteps.map(s=>`<p>🍳 ${s}</p>`).join('');
+                document.getElementById('recipe-result').style.display = 'block';
+            }
+        } catch(e) { alert("오류"); } finally { document.getElementById('loading').style.display = 'none'; }
+    }
+
+    window.onload = function() { loadData(); switchTab('home'); };
+</script>
+</body>
+</html>
