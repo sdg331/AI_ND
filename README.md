@@ -25,20 +25,15 @@ FridgeChef는 냉장고 재료를 인식하고 사용자 프로필을 반영해 
 ### 설치 및 실행
 
 ```bash
-cd baekend
+45초전
+cd backend
 
-# 가상환경 생성
-python -m venv venv
+.\venv\Scripts\Activate.ps1
 
-# 활성화 (Windows)
-venv\Scripts\activate.bat
+python app.py
 
 # 패키지 설치
 pip install -r requirements.txt
-
-# 백엔드 실행
-cd backend
-python app.py
 ```
 
 정상 실행 시:
