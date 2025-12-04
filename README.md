@@ -127,17 +127,16 @@ GOOGLE_SERVICE_ACCOUNT_EMAIL=fridge-chef-bot@fridgechef-478716.iam.gserviceaccou
 ## 사용 방법
 
 ### 터미널 명령어
-
-```bash
-# 가상환경 활성화
-venv\Scripts\activate.bat
-
 # 백엔드 진입
 cd backend
 
+```bash
+# 가상환경 활성화
+.\venv\Scripts\Activate.ps1
+
+
 # 서버 실행
 python app.py
-```
 
 문제 발생 시 `docs/TERMINAL_GUIDE.md` 참고
 
