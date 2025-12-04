@@ -1,56 +1,86 @@
 ```mermaid
 flowchart TD
-    %% 스타일 최소화 (GitHub 호환 위주)
-    classDef startend fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff
-    classDef proc fill:#E3F2FD,stroke:#2196F3,stroke-width:1px
-    classDef decision fill:#FFF3E0,stroke:#FF9800,stroke-width:1px
-    classDef api fill:#E8F5E8,stroke:#4CAF50,stroke-width:1px
+    %% 스타일 정의
+    classDef startend fill:#333,stroke:#333,stroke-width:2px,color:white,rx:10,ry:10;
+    classDef proc fill:#fff,stroke:#333,stroke-width:1px,color:black,rx:4,ry:4;
+    classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:black,rx:4,ry:4;
+    classDef subproc fill:#f5f5f5,stroke:#999,stroke-width:1px,color:black,stroke-dasharray: 5 5;
 
-    %% 앱 시작 & 온보딩
-    Start([cookmake 앱 시작]):::startend
-    A[앱 첫 실행]:::proc
-    B[권한 요청]:::proc
-    C[프로필 설정]:::proc
-    D[홈 화면 진입]:::proc
+    %% 노드 정의
+    Start([시작]):::startend
+    Finish([종료]):::startend
+    
+    %% 1. 온보딩 프로세스
+    subgraph Onboarding [앱 진입 및 설정]
+        direction TB
+        A[앱 첫 실행]:::proc --> B[온보딩 화면]:::proc
+        B --> C[권한 안내 및 동의]:::proc
+        C --> D[기본 프로필 설정]:::proc
+        D --> E[홈 화면 진입]:::proc
+    end
 
-    %% 재료 등록
-    I{재료 등록 방식}:::decision
-    J[카메라 촬영]:::proc
-    K[사진 캡처]:::proc
-    L[API /ingredients 호출]:::api
-    M[인식 결과 확인]:::proc
-    R[텍스트 직접 입력]:::proc
-    N[재료 저장 (Sheets)]:::api
-    T[재료 목록 갱신]:::proc
+    %% 메인 분기점
+    E --> F{재료 등록 여부}:::decision
 
-    %% 레시피 생성
-    H[레시피 생성 버튼]:::proc
-    V[API /recipe 호출]:::api
-    W[레시피 리스트 표시]:::proc
-    X[레시피 선택]:::proc
-    Y[쿠킹 모드]:::proc
+    %% 2. 재료 관리 프로세스
+    subgraph Fridge [나의 냉장고 - 재료 관리]
+        direction TB
+        F -- 예 --> G[Scan 탭 이동]:::proc
+        G --> I{등록 방식 선택}:::decision
+        
+        %% 카메라 등록
+        I -- 사진 촬영 --> J[카메라 권한 요청]:::proc
+        J --> K[냉장고 사진 촬영]:::proc
+        K --> L[서버 전송<br/>/ingredients 호출]:::proc
+        L --> M[AI 인식 결과 검토]:::proc
+        
+        %% 영수증 등록 (선택)
+        I -- 영수증 스캔 --> O[영수증 촬영]:::proc
+        O --> P[서버 전송]:::proc
+        P --> Q[리스트 추출]:::proc
+        Q --> M
+        
+        %% 직접 입력
+        I -- 직접 입력 --> R[재료명/수량 직접 입력]:::proc
+        R --> S[재료 저장 요청]:::proc
+        
+        M --> N[재료 저장 확정]:::proc
+        N --> T[현재 재료 목록 갱신]:::proc
+        S --> T
+    end
 
-    %% 챗봇
-    AA{챗봇 사용 여부}:::decision
-    BB[질문 입력]:::proc
-    DD[API /chat 호출]:::api
-    EE[AI 답변 표시]:::proc
-    FF[요리 진행]:::proc
+    %% 3. 요리 및 AI 프로세스
+    subgraph Cooking [레시피 및 요리]
+        direction TB
+        F -- 아니오 --> H[바로 레시피 생성 요청]:::proc
+        T --> U[재료 기반 레시피 생성 요청]:::proc
+        
+        H --> V[추천 레시피 리스트 표시]:::proc
+        U --> V
+        
+        V --> W[레시피 선택]:::proc
+        W --> X[레시피 상세 화면]:::proc
+        X --> Y[쿠킹 모드 진입]:::proc
+        
+        Y --> Z{AI 요리 챗봇 사용}:::decision
+        
+        %% AI 루프
+        Z -- 예 --> AA[AI 쿠킹 어시스턴트]:::subproc
+        AA --> AB[질문 전송<br/>/chat 호출]:::proc
+        AB --> AC[AI 답변 표시]:::proc
+        AC -.-> AD
+        
+        Z -- 아니오 --> AD[단계별 안내만 따라 요리]:::proc
+        AD --> AE[요리 완료]:::proc
+    end
 
-    %% 로그 & 종료
-    HH[사용 로그 저장]:::api
-    II[다음 추천 준비]:::proc
-    Finish([요리 완료]):::startend
+    %% 4. 후기 프로세스 (선택, 간단 로그용)
+    subgraph Review [후기 및 종료]
+        AE --> AF[간단 메모/평가 남기기]:::proc
+        AF --> AG[로그 전송<br/>Google Sheets 저장]:::proc
+        AG --> AH[홈 또는 레시피 리스트로 복귀]:::proc
+    end
 
-    %% 연결
-    Start --> A --> B --> C --> D
-    D --> I
-    I -->|사진| J --> K --> L --> M --> N --> T
-    I -->|텍스트| R --> N
-    T --> H
-    D --> H
-    H --> V --> W --> X --> Y --> AA
-    AA -->|예| BB --> DD --> EE --> FF
-    AA -->|아니오| FF
-    FF --> HH --> II --> Finish
-undefined
+    Start --> A
+    AH --> Finish
+```
