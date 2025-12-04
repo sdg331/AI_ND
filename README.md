@@ -110,12 +110,6 @@ Google Cloud 프로젝트 ID: `fridgechef-478716`
 ### 환경 변수
 프로젝트 루트에 `.env` 파일 생성:
 
-```env
-GEMINI_API_KEY=your_api_key
-GOOGLE_SHEETS_SPREADSHEET_ID=1tn2npx2hvbwVkpndUYW8y-V3qIVoV4sYgNcdCnkhKqA
-GOOGLE_PROJECT_ID=fridgechef-478716
-GOOGLE_SERVICE_ACCOUNT_EMAIL=fridge-chef-bot@fridgechef-478716.iam.gserviceaccount.com
-```
 
 ### 서비스 계정 설정
 1. Google Cloud Console에서 서비스 계정 생성
