@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COOKMATE</title>
+    <style>
+        /* --- 기본 스타일 --- */
+        body { font-family: 'Noto Sans KR', sans-serif; background-color: #f8f9fa; color: #333; margin: 0; padding-bottom: 100px; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        
+        input, button { padding: 12px; width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid #ddd; font-size: 1rem; }
+        input:focus { outline: none; border-color: #ff6b6b; }
+        button { background-color: #ff6b6b; color: white; border: none; cursor: pointer; font-weight: bold; margin-top: 5px; transition: 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        button:active { transform: scale(0.98); }
+        button.secondary { background-color: #868e96; }
+        button.outline { background-color: white; color: #ff6b6b; border: 1px solid #ff6b6b; margin: 0; }
+
+        /* 탭바 */
+      /* 탭바 */
+.bottom-nav { 
+    position: fixed; 
+    bottom: 0; 
+    left: 50%; /* 중앙 정렬 기준점 */
+    transform: translateX(-50%); /* 중앙 정렬 */
+    max-width: 600px; /* 본문과 동일한 너비 제한 */
+    width: 100%; 
+    height: 70px; 
+    background: white; 
+    border-top: 1px solid #eee; 
+    display: flex; 
+    justify-content: space-around; 
+    z-index: 1000; 
+}
+.nav-item { flex: 1; text-align: center; color: #adb5bd; font-size: 0.75rem; padding: 10px; background: none; border: none; cursor: pointer; }
+.nav-item.active { color: #ff6b6b; font-weight: bold; }
+        .nav-icon { display: block; font-size: 1.6rem; margin-bottom: 4px; }
+
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 스크롤 블록 */
+        .scroll-container { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 10px; width: 100%; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+        .scroll-container::-webkit-scrollbar { height: 6px; }
+        .scroll-container::-webkit-scrollbar-thumb { background: #ddd; border-radius: 10px; }
+        .select-block { min-width: 90px; height: 80px; background: white; border: 2px solid #eee; border-radius: 15px; display: flex; flex-direction: column; justify-content: center; align-items: center; cursor: pointer; transition: 0.2s; flex-shrink: 0; }
+        .select-block.selected { border-color: #ff6b6b; background-color: #fff5f5; color: #ff6b6b; }
+        .block-icon { font-size: 1.8rem; margin-bottom: 5px; }
+        .block-text { font-size: 0.8rem; font-weight: bold; text-align: center;}
+
+        /* 모달 (설정 팝업) */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: popUp 0.3s; }
+        @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; color: #333; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; color: #888; cursor: pointer; padding: 0; width: auto; box-shadow: none; }
+
+        /* 챗봇 */
+       /* 챗봇 */
+/* 챗봇 버튼 위치를 중앙 정렬된 모바일 뷰의 좌측 하단에 고정 */
+/* 챗봇 플로팅 버튼 (좌측 하단으로 이동 및 중앙 정렬 기준 설정) */
+.chat-fab { 
+    position: fixed; 
+    bottom: 80px; 
+    left: 50%; /* 중앙 기준으로 시작 */
+    transform: translateX(-300px); /* 600px 컨테이너의 좌측 경계에 맞춤 */
+    margin-left: 20px; /* 좌측에서 20px 여백 추가 */
+    width: 56px; height: 56px; 
+    background-color: #228be6; 
+    color: white; 
+    border-radius: 50%; 
+    display: flex; justify-content: center; align-items: center; 
+    font-size: 24px; 
+    box-shadow: 0 4px 15px rgba(34, 139, 230, 0.4); 
+    z-index: 1500; cursor: pointer; 
+    display: none; /* 탭 전환 JS에서 제어할 수 있도록 기본 숨김 */
+}
+/* 챗봇 말풍선 위치도 FAB에 맞춰 조정 */
+.chat-bubble { 
+    position: fixed; 
+    bottom: 145px; 
+    left: 50%; 
+    transform: translateX(-295px); /* FAB 위치에 맞춰 조정 */
+    background: #fff; 
+    padding: 8px 12px; 
+    border-radius: 15px; 
+    font-size: 0.8rem; 
+    font-weight: bold; 
+    color: #228be6; 
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+    z-index: 2000; 
+    pointer-events: none; 
+    animation: float 2s infinite ease-in-out; 
+}
+/* 챗봇 윈도우 중앙 정렬 */
+#chat-window { 
+    display: none; 
+    position: fixed; 
+    top: 50%; 
+    left: 50%; 
+    transform: translate(-50%, -50%); 
+    width: 90%; /* 모바일 뷰에 맞춰 꽉 차게 */
+    max-width: 400px; /* 최대 너비 제한 */
+    height: 70vh; 
+    background: white; 
+    border-radius: 20px; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3); 
+    z-index: 3000; 
+    flex-direction: column; 
+    overflow: hidden; 
+    border: 2px solid #e7f5ff; 
+    resize: none; /* 크기 조절 방지 */
+}.chat-messages { flex: 1; padding: 15px; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 80%; padding: 10px; border-radius: 12px; font-size: 0.9rem; }
+        .msg.user { align-self: flex-end; background: #228be6; color: white; }
+        .msg.bot { align-self: flex-start; background: white; border: 1px solid #eee; }
+        .chat-input-area { padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px; background: white; }
+        
+        /* 기타 */
+        #ingredient-list { list-style: none; padding: 0; }
+        .ingredient-item { background: white; padding: 15px; margin-bottom: 10px; border-radius: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .file-label { display: block; flex: 1; padding: 20px; background: #e7f5ff; color: #1c7ed6; text-align: center; border-radius: 15px; border: 2px dashed #74c0fc; cursor: pointer; }
+        input[type="file"] { display: none; }
+        #loading, #vision-loading { display: none; text-align: center; margin: 20px 0; color: #868e96; }
+        .delete-btn { background: #ffc9c9; color: #c92a2a; padding: 8px 12px; width: auto; font-size: 0.8rem; border-radius: 8px; }
+        #recipe-result { display: none; background: #fff; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); margin-top: 20px; border: 1px solid #ffe3e3; }
+        .pref-btn { background: #fff0f6; color: #e64980; border: 1px dashed #ff6b6b; width: 100%; padding: 15px; border-radius: 15px; margin-bottom: 20px; text-align: left; position: relative; }
+        .pref-btn:after { content: '⚙️ 설정 >'; position: absolute; right: 15px; }
+    /* --- [추가된 커뮤니티 스타일] --- */
+        /* 우측 하단 글쓰기 플로팅 버튼 */
+        /* 글쓰기 버튼 (우측 하단) */
+        /* 글쓰기 플로팅 버튼 (우측 하단으로 이동 및 중앙 정렬 기준 설정) */
+.fab-write { 
+    position: fixed; 
+    bottom: 80px; 
+    left: 50%; /* 중앙 기준으로 시작 */
+    transform: translateX(250px); /* 600px 컨테이너의 우측 경계(300px)에서 20px 안쪽으로 (-300px + 280px) */
+    margin-right: 20px; /* 우측에서 20px 여백 추가 */
+    width: 56px; height: 56px; 
+    background-color: #ff6b6b; color: white; 
+    border-radius: 50%; 
+    display: flex; justify-content: center; align-items: center; 
+    font-size: 24px; 
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4); 
+    z-index: 1500; cursor: pointer;
+    display: none; /* 챗봇/글쓰기 버튼이 상시 보이지 않도록 기본 숨김 처리 */
+}
+        
+        /* 글쓰기 입력창 디자인 */
+        .write-textarea {
+            width: 100%; height: 150px;
+            padding: 15px; border: 1px solid #eee;
+            border-radius: 12px; resize: none;
+            font-family: inherit; font-size: 15px;
+            box-sizing: border-box; margin-bottom: 10px;
+        }
+        .write-textarea:focus { outline: none; border-color: #ff6b6b; }
+        /* --- [커뮤니티 서브 탭 스타일] --- */
+.comm-tabs { 
+    display: flex; 
+    border-bottom: 1px solid #eee; 
+    margin-bottom: 15px; 
+    background: white; 
+    border-radius: 10px; 
+    overflow: hidden; 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
+}
+.comm-tab { 
+    flex: 1; padding: 12px; text-align: center; cursor: pointer; 
+    font-weight: 600; color: #888; border-bottom: 3px solid transparent; 
+    transition: 0.2s; 
+}
+.comm-tab.active { 
+    color: #ff6b6b; border-bottom: 3px solid #ff6b6b; 
+    background-color: #fff5f5; 
+}
+.sub-content { display: none; }
+.sub-content.active { display: block; }
+
+/* 인스타그램 형태의 피드 카드 스타일 */
+.feed-card { 
+    background: white; 
+    border-radius: 15px; 
+    overflow: hidden; 
+    margin-bottom: 20px; 
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
+}
+.feed-header { 
+    padding: 12px 15px; 
+    display: flex; 
+    align-items: center; 
+    border-bottom: 1px solid #f8f9fa; 
+}
+.profile-pic { 
+    width: 36px; height: 36px; 
+    background: #ffebeb; 
+    border-radius: 50%; 
+    margin-right: 10px; 
+    display: flex; justify-content: center; align-items: center; 
+    font-size: 18px; color: #ff6b6b; font-weight: bold; 
+}
+.feed-img { 
+    width: 100%; 
+    height: 250px; 
+    object-fit: cover; 
+    background: #f1f3f5; /* 로딩 배경 */
+}
+.feed-body { padding: 15px; }
+.feed-text { font-size: 15px; line-height: 1.5; color: #333; margin-bottom: 10px; }
+.feed-meta { font-size: 12px; color: #888; display: flex; justify-content: space-between; align-items: center; }
+.like-btn { 
+    background: none; color: #ff6b6b; border: none; 
+    padding: 5px 10px; width: auto; font-size: 16px; margin: 0; box-shadow: none; 
+}
+    </style>
+</head>
+<body>
+
+<div style="background: white; padding: 15px 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.03);">
+    <div style="display: flex; justify-content: space-between; align-items: center; max-width: 600px; margin: 0 auto;">
+        <h1 style="margin: 0; font-size: 1.3rem;">🥕 COOKMATE</h1>
+        <div style="font-size: 0.8rem; color: #888;">
+            <input type="text" id="my-user-id" value="user1" style="width: 60px; padding: 5px; text-align: center; display: inline-block;">
+            <button onclick="loadData()" style="width: auto; padding: 5px 10px; font-size: 0.7rem;" class="outline">🔄</button>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <div id="tab-home" class="tab-content active">
+        <h2 style="margin-top: 0;">📸 재료 추가</h2>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <label for="my-img-input" class="file-label">🍎<br>사진 촬영</label>
+            <label for="receipt-input" class="file-label" style="background:#f3f0ff; color:#7950f2; border-color:#b197fc;">🧾<br>영수증 OCR</label>
+        </div>
+        <input type="file" id="my-img-input" accept="image/*" onchange="uploadImage()">
+        <input type="file" id="receipt-input" accept="image/*" onchange="uploadReceipt()">
+        <div id="vision-loading">🤖 분석 중...</div>
+
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <input type="text" id="my-ing-name" placeholder="이름 (예: 양파)" style="flex: 2;">
+            <input type="text" id="my-ing-qty" placeholder="수량" style="flex: 1;">
+            <button onclick="addIngredient()" style="flex: 1;">추가</button>
+        </div>
+        <h2>🧊 나의 냉장고</h2>
+        <ul id="ingredient-list"></ul>
+        <div id="empty-msg" style="text-align: center; color: #adb5bd; margin-top: 20px; display: none;">텅 비었어요!</div>
+    </div>
+
+    <div id="tab-recipe" class="tab-content">
+        <div style="text-align: center; padding: 30px 0;">
+            <button class="pref-btn" onclick="openPrefModal()">
+                <strong>🧐 어떤 요리를 만들까요?</strong><br>
+                <span style="font-size: 0.8rem; color: #868e96; font-weight: normal;">재료범위, 종류, 상황, 난이도 설정</span>
+            </button>
+
+            <div style="font-size: 4rem;">👨‍🍳</div>
+            <h3>AI 셰프의 추천</h3>
+            <button onclick="generateRecipe()" style="width: auto; padding: 15px 30px; border-radius: 30px;">✨ 레시피 추천받기</button>
+        </div>
+        <div id="loading">요리 중...</div>
+        <div id="recipe-result">
+            <h3 id="res-title" style="color: #ff6b6b;"></h3>
+            <p><strong>🛒 재료:</strong> <span id="res-materials"></span></p>
+            <div id="res-steps" style="margin-top:15px;"></div>
+        </div>
+    </div>
+
+    <div id="tab-profile" class="tab-content">
+        <h2 style="margin-top: 0;">👤 기본 프로필</h2>
+        <label>🚫 알레르기</label><input type="text" id="prof-allergies">
+        <label style="margin-top: 15px;">🔪 조리도구</label><div class="scroll-container" id="tools-container"></div>
+        <label style="margin-top: 15px;">🎯 목표</label><div class="scroll-container" id="goals-container"></div>
+        <button onclick="saveProfile()" style="margin-top: 30px;">저장하기</button>
+    </div>
+    <div id="tab-community" class="tab-content">
+    
+    <div class="comm-tabs" style="margin-top: 10px;">
+        <div class="comm-tab active" data-tab="recommend" onclick="switchSubTab('recommend', this)">추천</div>
+        <div class="comm-tab" data-tab="mine" onclick="switchSubTab('mine', this)">나의 글</div>
+    </div>
+
+    <div id="feed-recommend" class="sub-content active">
+        <ul id="post-feed-list">
+            </ul>
+        <div id="empty-feed-recommend" style="text-align: center; color: #adb5bd; padding: 40px 0; display: none;">
+            첫 번째 후기를 기다리고 있어요! 📝
+        </div>
+    </div>
+
+    <div id="feed-mine" class="sub-content">
+        <ul id="my-post-feed-list">
+            </ul>
+        <div id="empty-feed-mine" style="text-align: center; color: #adb5bd; padding: 40px 0; display: none;">
+            아직 작성한 글이 없어요. ✏️
+        </div>
+    </div>
+
+</div>
+</div>
+
+<div id="pref-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>🍳 레시피 설정</h3>
+            <button class="close-btn" onclick="closePrefModal()">✕</button>
+        </div>
+        
+        <label>1. 재료 범위</label>
+        <div class="scroll-container" id="pref-scope-container"></div>
+        
+        <label style="margin-top: 20px;">2. 요리 종류</label>
+        <div class="scroll-container" id="pref-type-container"></div>
+        
+        <label style="margin-top: 20px;">3. 상황</label>
+        <div class="scroll-container" id="pref-occasion-container"></div>
+        
+        <label style="margin-top: 20px;">4. 난이도</label>
+        <div class="scroll-container" id="pref-difficulty-container"></div>
+
+        <button onclick="savePreferences()" style="margin-top: 30px;">설정 저장하기</button>
+    </div>
+</div>
+
+<div class="chat-bubble">도움이 필요하신가요?</div>
+<div class="chat-fab" onclick="toggleChat()">🆘</div>
+<div id="chat-window" style="display:none;">
+    <div class="chat-header"><span>👨‍🍳 쿠킹 어시스턴트</span><button class="close-chat" onclick="toggleChat()">✕</button></div>
+    <div class="chat-messages" id="chat-messages"><div class="msg bot">안녕하세요! 무엇을 도와드릴까요?</div></div>
+    <div class="chat-input-area"><input type="text" id="chat-input"><button onclick="sendChat()">전송</button></div>
+</div>
+<div class="fab-write" onclick="openWriteModal()">✏️</div>
+
+<div id="write-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>📝 후기 작성</h3>
+            <button class="close-btn" onclick="closeWriteModal()">✕</button>
+        </div>
+        
+        <textarea id="post-content" class="write-textarea" placeholder="요리는 어떠셨나요? 레시피 후기를 공유해주세요!"></textarea>
+        
+        <label for="post-img-input" class="file-label" style="height: auto; padding: 15px; margin-bottom: 15px;">
+            <span style="font-size: 1.2rem;">📸</span> 요리 사진 올리기
+        </label>
+        <input type="file" id="post-img-input" accept="image/*">
+        
+        <button onclick="submitPost()">등록하기</button>
+    </div>
+</div>
+<nav class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('home')"><span class="nav-icon">🧊</span>냉장고</button>
+    <button class="nav-item" onclick="switchTab('recipe')"><span class="nav-icon">🧑‍🍳</span>AI 셰프</button>
+    <button class="nav-item" onclick="switchTab('community')"><span class="nav-icon">💬</span>커뮤니티</button>
+    <button class="nav-item" onclick="switchTab('profile')"><span class="nav-icon">👤</span>프로필</button>
+</nav>
+
+<script>
+    const API_URL = "http://127.0.0.1:5000";
+    let currentRecipeName = "";
+
+    // --- 데이터 정의 ---
+    const PREF_SCOPE = [{icon:"🏠",name:"집 재료만"}, {icon:"🛒",name:"외부 재료 포함"}];
+    const PREF_TYPE = [{icon:"🍚",name:"식사"}, {icon:"🥪",name:"간식"}, {icon:"🍺",name:"안주"}];
+    const PREF_OCCASION = [{icon:"🙍",name:"혼자"}, {icon:"👨‍👩‍👧",name:"가족"}, {icon:"🎉",name:"손님접대"}];
+    const PREF_DIFFICULTY = [{icon:"🐣",name:"쉬움"}, {icon:"👨‍🍳",name:"보통"}, {icon:"🔥",name:"어려움"}];
+    const TOOL_LIST = [{icon:"🍳",name:"프라이팬"},{icon:"🔥",name:"가스레인지"},{icon:"🥘",name:"냄비"},{icon:"♨️",name:"에어프라이어"},{icon:"🍕",name:"오븐"},{icon:"⚡",name:"전자레인지"}];
+    const GOAL_LIST = [{icon:"🥗",name:"다이어트"},{icon:"💪",name:"고단백"},{icon:"🧂",name:"저염식"},{icon:"🌿",name:"비건"}];
+
+    // --- UI 함수 ---
+    function createBlocks(cid, list, sel, multi=true) {
+        const c = document.getElementById(cid); c.innerHTML = ''; 
+        const sels = sel ? sel.split(',').map(s=>s.trim()) : [];
+        list.forEach(i => {
+            const d = document.createElement('div'); d.className = 'select-block';
+            if(sels.includes(i.name)) d.classList.add('selected');
+            d.onclick = () => {
+                if(!multi) { // 단일 선택 모드
+                    Array.from(c.children).forEach(child=>child.classList.remove('selected'));
+                    d.classList.add('selected');
+                } else { // 다중 선택 모드
+                    d.classList.toggle('selected');
+                }
+            };
+            d.innerHTML = `<span class="block-icon">${i.icon}</span><span class="block-text">${i.name}</span>`;
+            c.appendChild(d);
+        });
+    }
+    function getVal(cid) { return Array.from(document.querySelectorAll(`#${cid} .select-block.selected .block-text`)).map(el=>el.innerText).join(','); }
+
+    // --- 모달 제어 ---
+    function openPrefModal() { document.getElementById('pref-modal').style.display = 'flex'; }
+    function closePrefModal() { document.getElementById('pref-modal').style.display = 'none'; }
+
+    // --- 데이터 로드 & 저장 ---
+    async function loadData() {
+        const uid = document.getElementById('my-user-id').value;
+        // 재료 로드
+        try {
+            const r = await fetch(`${API_URL}/ingredients/${uid}`); const l = await r.json();
+            const ul = document.getElementById('ingredient-list'); ul.innerHTML = '';
+            if(l.length===0) document.getElementById('empty-msg').style.display='block';
+            else { document.getElementById('empty-msg').style.display='none'; l.forEach(i=>{ul.innerHTML+=`<li class="ingredient-item"><span>${i.name} ${i.quantity}</span><button class="delete-btn" onclick="del('${i.id}')">삭제</button></li>`}); }
+        } catch(e){}
+        // 프로필 & 설정 로드
+        try {
+            const r = await fetch(`${API_URL}/users/${uid}`); const d = await r.json();
+            if(!d.error) {
+                // 기본 프로필
+                document.getElementById('prof-allergies').value = d.allergies||'';
+                createBlocks('tools-container', TOOL_LIST, d.tools||'');
+                createBlocks('goals-container', GOAL_LIST, d.goals||'');
+                // 레시피 설정 (단일 선택)
+                createBlocks('pref-scope-container', PREF_SCOPE, d.pref_scope||'', false);
+                createBlocks('pref-type-container', PREF_TYPE, d.pref_type||'', false);
+                createBlocks('pref-occasion-container', PREF_OCCASION, d.pref_occasion||'', false);
+                createBlocks('pref-difficulty-container', PREF_DIFFICULTY, d.pref_difficulty||'', false);
+            }
+        } catch(e){}
+    }
+
+    async function saveProfile() {
+        const uid = document.getElementById('my-user-id').value;
+        const d = { allergies: document.getElementById('prof-allergies').value, tools: getVal('tools-container'), goals: getVal('goals-container') };
+        await sendUpdate(uid, d);
+    }
+
+    async function savePreferences() {
+        const uid = document.getElementById('my-user-id').value;
+        const d = {
+            pref_scope: getVal('pref-scope-container'),
+            pref_type: getVal('pref-type-container'),
+            pref_occasion: getVal('pref-occasion-container'),
+            pref_difficulty: getVal('pref-difficulty-container')
+        };
+        await sendUpdate(uid, d);
+        closePrefModal();
+    }
+
+    async function sendUpdate(uid, data) {
+        try { await fetch(`${API_URL}/users/${uid}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); alert("저장되었습니다!"); }
+        catch(e) { alert("오류"); }
+    }
+
+    // --- 기타 기능 (챗봇, 탭전환, 레시피생성 등) ---
+    // (기존 switchTab 함수 전체를 이 코드로 덮어쓰세요)
+function switchTab(n) {
+    document.querySelectorAll('.tab-content').forEach(e=>e.classList.remove('active'));
+    document.getElementById('tab-'+n).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+    
+    // 버튼 활성화
+    if(n=='home') document.querySelectorAll('.nav-item')[0].classList.add('active');
+    if(n=='recipe') document.querySelectorAll('.nav-item')[1].classList.add('active');
+    if(n=='community') {
+        document.querySelectorAll('.nav-item')[2].classList.add('active');
+        // 👇 커뮤니티 탭 진입 시: 기본값 ('recommend')으로 피드 로드
+        switchSubTab('recommend', document.querySelector('.comm-tab[data-tab="recommend"]'));
+    }
+    if(n=='profile') document.querySelectorAll('.nav-item')[3].classList.add('active');
+
+    // 글쓰기/챗봇 버튼 가시성 제어 (이전 단계에서 수정한 로직)
+    const fabWrite = document.querySelector('.fab-write');
+    const fabChat = document.querySelector('.chat-fab');
+    if (fabWrite) { fabWrite.style.display = (n === 'community') ? 'flex' : 'none'; }
+    if (fabChat) { fabChat.style.display = (n === 'recipe') ? 'flex' : 'none'; }
+
+    // 챗봇 말풍선 제어
+    const chatBubble = document.querySelector('.chat-bubble');
+    if (chatBubble) {
+        chatBubble.style.display = (n === 'recipe') ? 'block' : 'none'; 
+    }
+}
+    async function addIngredient() {
+        const uid = document.getElementById('my-user-id').value; const n = document.getElementById('my-ing-name').value; const q = document.getElementById('my-ing-qty').value;
+        if(!n) return alert("입력하세요");
+        await fetch(`${API_URL}/ingredients/${uid}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:n, quantity:q})});
+        loadData();
+    }
+    async function del(id) { if(confirm("삭제?")) { await fetch(`${API_URL}/ingredients/delete/${id}`, {method:'POST'}); loadData(); } }
+    async function uploadImage() { /* 기존 사진 코드 */ }
+    async function uploadReceipt() { /* 기존 영수증 코드 */ }
+    
+    function toggleChat() { const w = document.getElementById('chat-window'); w.style.display = (w.style.display==='flex')?'none':'flex'; }
+    async function sendChat() {
+        const i = document.getElementById('chat-input'); const m = i.value; if(!m) return;
+        const c = document.getElementById('chat-messages'); c.innerHTML+=`<div class="msg user">${m}</div>`; i.value='';
+        try { const r = await fetch(`${API_URL}/ai/chat`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:m, context:currentRecipeName})}); const d = await r.json(); c.innerHTML+=`<div class="msg bot">${d.answer||d.error}</div>`; }
+        catch(e){ c.innerHTML+=`<div class="msg bot">오류</div>`; }
+    }
+
+    // (기존 function generateRecipe() 함수 전체를 이 코드로 덮어쓰세요)
+// (기존 function generateRecipe() 함수 전체를 이 코드로 덮어쓰세요)
+async function generateRecipe() {
+    const userId = document.getElementById('my-user-id').value;
+    document.getElementById('loading').style.display = 'block'; 
+    document.getElementById('recipe-result').style.display = 'none';
+    
+    try {
+        const response = await fetch(`${API_URL}/ai/generate`, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userId })
+        });
+        const result = await response.json();
+        
+        document.getElementById('loading').style.display = 'none';
+
+        if (result.error) {
+            alert(result.error);
+        } else {
+            // [핵심 수정]: Array.isArray() 체크 후 배열 데이터를 문자열로 변환합니다.
+            const materials = Array.isArray(result.materialsUsed) 
+                              ? result.materialsUsed.join(', ') // 배열이면 쉼표로 연결
+                              : result.materialsUsed; // 문자열이면 그대로 사용
+
+            const stepsHtml = Array.isArray(result.cookingSteps)
+                              ? result.cookingSteps.map(s => `<p>🍳 ${s}</p>`).join('') // 배열이면 <p> 태그로 감싸서 연결
+                              : `<p>🍳 ${result.cookingSteps}</p>`; // 배열이 아니면 그대로 사용
+
+            // 레시피 결과를 전역 변수에 저장 (FinishCooking 함수에서 사용)
+            window.currentRecipeName = result.recipeName;
+            window.currentRecipeIngredientsText = materials; 
+            
+            // 1. 결과 화면 표시
+            document.getElementById('res-title').innerText = result.recipeName;
+            document.getElementById('res-materials').innerHTML = materials; 
+            document.getElementById('res-steps').innerHTML = stepsHtml; // 조리 순서 HTML 삽입
+            
+            // 2. 팁과 버튼 영역 업데이트
+            document.getElementById('res-tip').innerHTML = result.tip;
+
+            // 3. 요리 시작 버튼 영역 표시 (새로 생성된 버튼 로직 포함)
+            const buttonContainer = document.getElementById('cooking-action-area');
+            if (buttonContainer) { // 만약 이전에 버튼이 있었다면 그대로 두고, 없다면 추가
+                 buttonContainer.innerHTML = `
+                    <button id="start-cooking-btn" onclick="startCooking()" style="background: #20c997; flex: 1;">요리 시작</button>
+                    <button id="finish-cooking-btn" class="hidden" onclick="finishCooking()" style="background: #fa5252; flex: 1;">요리 완료 (재료 차감)</button>
+                 `;
+            }
+
+            document.getElementById('recipe-result').style.display = 'block';
+        }
+    } catch (e) {
+        alert("오류 발생");
+        document.getElementById('loading').style.display = 'none';
+    }
+}
+// --- [추가] 글쓰기 모달 제어 기능 ---
+    function openWriteModal() {
+        // [중요] 모달이 뜰 때, 현재 로그인된 유저 ID를 확인합니다.
+        if (document.getElementById('my-user-id').value === "") {
+            alert("사용자 ID를 먼저 입력해주세요.");
+            return;
+        }
+        // 모달 팝업 띄우기
+        document.getElementById('write-modal').style.display = 'flex';
+        // 챗봇이 열려있으면 닫기
+        document.getElementById('chat-window').style.display = 'none';
+    }
+
+    function closeWriteModal() {
+        document.getElementById('write-modal').style.display = 'none';
+        // 폼 초기화 (사진 입력창 초기화)
+        document.getElementById('post-img-input').value = ''; 
+    }
+    // --- [신규 기능: 커뮤니티 JS 로직] ---
+// --- [신규 기능: 게시글 작성 (POST) 로직] ---
+// (기존 submitPost 함수 전체를 이 코드로 덮어쓰세요)
+async function submitPost() {
+    const userId = document.getElementById('my-user-id').value;
+    const content = document.getElementById('post-content').value;
+    // index.html에 있는 input file의 ID를 확인하고 수정해야 합니다. 
+    // 기존 코드에서는 post-img-input이었습니다.
+    const imgFile = document.getElementById('post-img-input').files[0]; 
+
+    if (!content.trim() && !imgFile) {
+        alert("내용을 입력하거나 사진을 첨부해 주세요.");
+        return;
+    }
+    if (!userId) {
+        alert("사용자 ID를 먼저 입력해주세요.");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('userId', userId);
+    formData.append('content', content);
+    
+    if (imgFile) {
+        // 백엔드 app.py에서 'image'로 받으므로 이름 통일
+        formData.append('image', imgFile); 
+    }
+    
+    const submitButton = document.querySelector('#write-modal button[onclick="submitPost()"]');
+    submitButton.textContent = '등록 중...';
+    submitButton.disabled = true;
+
+    try {
+        // 🚨 수정: URL을 '/community/posts' (복수)로 수정했습니다.
+        const response = await fetch(`${API_URL}/community/posts`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            alert("후기가 성공적으로 등록되었습니다!");
+            document.getElementById('post-content').value = '';
+            closeWriteModal();
+            
+            const isMine = (currentCommunityFilter === 'mine');
+            // 등록 후, 현재 탭 기준으로 피드 새로고침
+            loadCommunityPosts(isMine);
+
+        } else {
+            const errorText = await response.text();
+            alert(`후기 등록 실패: ${errorText}`);
+        }
+    } catch (e) {
+        console.error("게시글 등록 중 오류 발생:", e);
+        alert("네트워크 오류가 발생했습니다.");
+    } finally {
+        submitButton.textContent = '등록하기';
+        submitButton.disabled = false;
+    }
+}
+// --- [신규 기능: 게시글 '좋아요' 기능] ---
+// 이 함수는 app.py의 POST /community/posts/like 엔드포인트를 호출합니다.
+async function toggleLike(postId) {
+    try {
+        const response = await fetch(`${API_URL}/community/posts/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ postId: postId })
+        });
+
+        if (response.ok) {
+            // 좋아요 성공 후, 현재 활성화된 탭 기준으로 피드 새로고침
+            const isMine = (currentCommunityFilter === 'mine');
+            loadCommunityPosts(isMine);
+        } else {
+            const errorText = await response.text();
+            alert(`좋아요 실패: ${errorText}`);
+        }
+    } catch (e) {
+        console.error("좋아요 처리 중 오류 발생:", e);
+        alert("네트워크 오류가 발생했습니다.");
+    }
+}
+// 게시글 목록을 화면에 그려주는 함수 (다음 단계에서 완성됨)
+// (기존 renderPosts 함수 전체를 이 코드로 덮어쓰세요)
+function renderPosts(posts, isMine) {
+    const targetListId = isMine ? 'my-post-feed-list' : 'post-feed-list';
+    const ul = document.getElementById(targetListId);
+    
+    // 이전에 숨겨둔 '빈 피드' 메시지를 모두 숨김 처리
+    document.getElementById('empty-feed-recommend').style.display = 'none';
+    document.getElementById('empty-feed-mine').style.display = 'none';
+    
+    ul.innerHTML = ''; // 목록 비우기
+
+    if (posts.length === 0) {
+        // 목록이 비어있다면 해당 탭에 맞는 메시지를 보여줍니다.
+        const emptyMsgId = isMine ? 'empty-feed-mine' : 'empty-feed-recommend';
+        document.getElementById(emptyMsgId).style.display = 'block';
+        return;
+    }
+
+    // 게시글 카드를 화면에 그리는 핵심 로직
+    posts.forEach(post => {
+        // 이미지는 Base64 데이터이므로 직접 소스로 사용 가능
+        const imageHtml = post.image ? 
+            `<div class="feed-img" style="background-image: url('data:image/jpeg;base64,${post.image}'); background-size: cover; background-position: center;"></div>` : 
+            `<div class="feed-img" style="height: 100px; padding: 20px;">사진 없음</div>`;
+
+        // 게시글 HTML 카드 생성
+        const cardHtml = `
+            <li class="feed-card">
+                <div class="feed-header">
+                    <div class="profile-pic">👤</div>
+                    <div>
+                        <strong style="font-size: 14px;">${post.nickname || post.userId}</strong>
+                        <div style="font-size: 11px; color: #888;">${new Date(post.timestamp).toLocaleDateString()}</div>
+                    </div>
+                </div>
+
+                ${imageHtml}
+                
+                <div class="feed-body">
+                    <p class="feed-text">${post.content}</p>
+                    <div class="feed-meta">
+                        <span style="font-weight: 600;">좋아요 ${post.likes || 0}개</span>
+                        <button class="like-btn" onclick="toggleLike('${post.id}')">❤️</button>
+                    </div>
+                </div>
+            </li>
+        `;
+        ul.innerHTML += cardHtml; // 목록에 추가
+    });
+}
+let currentCommunityFilter = 'recommend'; // 현재 활성 서브 탭 상태 저장
+
+// 백엔드에서 게시글 데이터를 가져오는 함수
+async function loadCommunityPosts(isMine) {
+    const userId = document.getElementById('my-user-id').value;
+    const filterId = isMine ? userId : ''; // '나의 글' 탭일 경우만 userId로 필터링
+
+    // 로딩 처리 (필요하다면 로딩 스피너를 여기에 띄울 수 있음)
+
+    try {
+        // 백엔드 API 호출 (GET /community/posts)
+        const response = await fetch(`${API_URL}/community/posts?userId=${filterId}`);
+        const posts = await response.json();
+        
+        renderPosts(posts, isMine); 
+    } catch (e) {
+        console.error("게시글 로딩 실패:", e);
+        // alert("게시글 로딩에 실패했습니다."); // 오류가 너무 자주 뜨므로 주석 처리
+    }
+}
+
+// 서브 탭 전환 로직 (추천 / 나의 글)
+function switchSubTab(tabName, el) {
+    // 1. UI 스타일 전환
+    document.querySelectorAll('.comm-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    
+    // 2. 내용 영역 전환
+    document.querySelectorAll('.sub-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('feed-' + tabName).classList.add('active');
+    
+    currentCommunityFilter = tabName; // 필터 상태 저장
+    
+    // 3. 데이터 로드 트리거
+    const isMine = (tabName === 'mine');
+    loadCommunityPosts(isMine);
+}
+// --- [신규 기능: 요리 시작/완료 및 재료 차감 로직] ---
+
+// CSS 추가: hidden 클래스를 활용하기 위한 스타일을 <style> 태그 내부에 추가해야 합니다.
+/* <style> 태그 안에 아래 코드를 추가해주세요.
+.hidden {
+    display: none !important;
+}
+*/
+
+// 요리 시작: 버튼을 전환하고 준비 상태를 표시
+function startCooking() {
+    document.getElementById('start-cooking-btn').classList.add('hidden');
+    document.getElementById('finish-cooking-btn').classList.remove('hidden');
+    alert(`[${window.currentRecipeName}] 요리를 시작합니다! 재료 차감 준비 완료.`);
+}
+
+// 요리 완료: 재료를 차감하고 냉장고 DB에 반영
+async function finishCooking() {
+    const userId = document.getElementById('my-user-id').value;
+    
+    // 🚨 여기서 백엔드로 전송할 데이터는 재료 파싱이 완료된 상태여야 합니다.
+    const deductionData = {
+        userId: userId,
+        // 이 텍스트를 백엔드가 받아서 재료와 수량을 파싱해야 합니다.
+        recipeMaterialsText: window.currentRecipeIngredientsText, 
+        recipeName: window.currentRecipeName 
+    };
+    
+    if (!confirm(`[${window.currentRecipeName}] 요리를 완료했습니다. 레시피에 쓰인 재료를 냉장고에서 차감할까요?`)) {
+        document.getElementById('start-cooking-btn').classList.remove('hidden');
+        document.getElementById('finish-cooking-btn').classList.add('hidden');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/refrigerator/deduct`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(deductionData)
+        });
+
+        if (response.ok) {
+            alert("요리 완료! 재료가 성공적으로 차감되었습니다. 😊");
+            loadData(); // 냉장고 목록 갱신
+        } else {
+            const errorText = await response.text();
+            alert(`재료 차감 실패: ${errorText}. 백엔드에서 파싱 로직을 확인하세요.`);
+        }
+    } catch (e) {
+        console.error("재료 차감 중 네트워크 오류:", e);
+        alert("네트워크 오류가 발생했습니다.");
+    } finally {
+        // 버튼 원상 복구
+        document.getElementById('start-cooking-btn').classList.remove('hidden');
+        document.getElementById('finish-cooking-btn').classList.add('hidden');
+    }
+}
+    window.onload = function() { loadData(); switchTab('home'); };
+</script>
+</body>
+</html>
