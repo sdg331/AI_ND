@@ -1,4 +1,4 @@
-# FridgeChef
+# COOKMAKE
 
 냉장고 속 재료로 AI가 맞춤 레시피를 추천해주는 모바일 앱
 
