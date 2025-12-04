@@ -25,6 +25,8 @@ FridgeChef는 냉장고 재료를 인식하고 사용자 프로필을 반영해 
 ### 설치 및 실행
 
 ```bash
+cd baekend
+
 # 가상환경 생성
 python -m venv venv
 
