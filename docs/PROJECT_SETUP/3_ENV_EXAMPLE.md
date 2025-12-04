@@ -4,14 +4,6 @@
 이 파일은 깃허브에 커밋하지 않고, `.env.example`만 공유용으로 둡니다.
 
 ```text
-Google Gemini / AI
-GEMINI_API_KEY=AIzaSyDBoHyvmWs6caj9KNCMDrLJ9nBv3rm5SaI
-
-Google Sheets
-GOOGLE_SHEETS_SPREADSHEET_ID=1tn2npx2hvbwVkpndUYW8y-V3qIVoV4sYgNcdCnkhKqA
-GOOGLE_PROJECT_ID=fridgechef-478716
-GOOGLE_SERVICE_ACCOUNT_EMAIL=fridge-chef-bot@fridgechef-478716.iam.gserviceaccount.com
-```
 
 ```text
 권장:
